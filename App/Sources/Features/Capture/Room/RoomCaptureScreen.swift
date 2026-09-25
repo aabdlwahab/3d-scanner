@@ -71,20 +71,10 @@ final class RoomCaptureModel {
         do {
             let data: FloorPlanData
             do {
-                let structure = try await StructureBuilder(options: [.beautifyObjects]).capturedStructure(from: rooms)
-                data = FloorPlanData(structure: structure)
-                try await Task.detached(priority: .userInitiated) {
-                    try structure.export(to: files.roomUSDZ, exportOptions: .mesh)
-                    try JSONEncoder().encode(structure).write(to: files.roomStructure, options: .atomic)
-                }.value
+                data = try await Self.exportStructure(of: rooms, to: files)
             } catch where rooms.count == 1 {
                 // Merging can fail for a single room — export it on its own.
-                let room = rooms[0]
-                data = FloorPlanData(room: room)
-                try await Task.detached(priority: .userInitiated) {
-                    try room.export(to: files.roomUSDZ, exportOptions: .mesh)
-                    try JSONEncoder().encode(room).write(to: files.roomStructure, options: .atomic)
-                }.value
+                data = try await Self.exportRoom(rooms[0], to: files)
             }
             try data.write(to: files.floorPlan)
 
@@ -108,6 +98,24 @@ final class RoomCaptureModel {
             phase = .failed("Couldn't build the apartment model: \(error.localizedDescription)")
             return nil
         }
+    }
+
+    /// Merges the rooms and writes the RoomPlan USDZ and JSON.
+    private static func exportStructure(of rooms: [CapturedRoom], to files: ScanFiles) async throws -> FloorPlanData {
+        let structure = try await StructureBuilder(options: [.beautifyObjects]).capturedStructure(from: rooms)
+        try await Task.detached(priority: .userInitiated) {
+            try structure.export(to: files.roomUSDZ, exportOptions: .mesh)
+            try JSONEncoder().encode(structure).write(to: files.roomStructure, options: .atomic)
+        }.value
+        return FloorPlanData(structure: structure)
+    }
+
+    private static func exportRoom(_ room: CapturedRoom, to files: ScanFiles) async throws -> FloorPlanData {
+        try await Task.detached(priority: .userInitiated) {
+            try room.export(to: files.roomUSDZ, exportOptions: .mesh)
+            try JSONEncoder().encode(room).write(to: files.roomStructure, options: .atomic)
+        }.value
+        return FloorPlanData(room: room)
     }
 }
 
