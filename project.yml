@@ -1,0 +1,55 @@
+# XcodeGen spec — run `xcodegen generate` to create ScanSpace.xcodeproj.
+# CI (GitHub Actions) generates the project on every build, so the .xcodeproj is not committed.
+name: ScanSpace
+options:
+  bundleIdPrefix: com.scanspace
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  ScanSpace:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Sources
+      - path: App/Resources
+    settings:
+      base:
+        PRODUCT_NAME: ScanSpace
+        PRODUCT_BUNDLE_IDENTIFIER: com.scanspace.app
+        INFOPLIST_FILE: App/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        SWIFT_EMIT_LOC_STRINGS: NO
+      configs:
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: -O
+          SWIFT_COMPILATION_MODE: wholemodule
+    dependencies:
+      - sdk: ARKit.framework
+      - sdk: RoomPlan.framework
+      - sdk: SceneKit.framework
+      - sdk: QuickLook.framework
+      - sdk: CoreImage.framework
+schemes:
+  ScanSpace:
+    build:
+      targets:
+        ScanSpace: all
+    run:
+      config: Debug
+    archive:
+      config: Release

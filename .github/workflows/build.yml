@@ -1,0 +1,75 @@
+name: Build app & publish install page
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build IPA
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      IOS_CERTIFICATE_P12: ${{ secrets.IOS_CERTIFICATE_P12 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: scripts/ci/select-xcode.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build IPAs
+        env:
+          APP_VERSION: 1.0.${{ github.run_number }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: scripts/ci/build-ipa.sh
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Assemble install site
+        env:
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: scripts/ci/assemble-site.sh
+
+      - name: Upload IPAs
+        uses: actions/upload-artifact@v7
+        with:
+          name: ScanSpace-ipa-${{ github.run_number }}
+          path: build/*.ipa
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Publish install page
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

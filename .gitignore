@@ -1,0 +1,17 @@
+# Xcode (the project is generated from project.yml by XcodeGen)
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.xcarchive
+
+# Local tooling output
+.build/
+Tests/.out/
+_site/
+
+# macOS
+.DS_Store
+.claude/

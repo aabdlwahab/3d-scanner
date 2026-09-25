@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ScanSpace – Install</title>
+  <meta name="description" content="ScanSpace turns an iPhone with LiDAR into a 3D scanner for rooms, apartments and objects. Install it straight from this page — no App Store.">
+  <meta name="theme-color" content="#0b0d1c">
+  <meta name="apple-mobile-web-app-title" content="ScanSpace">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="icon" type="image/png" href="assets/icon-64.png">
+  <meta property="og:title" content="ScanSpace – LiDAR 3D scanner for iPhone">
+  <meta property="og:description" content="Scan rooms and whole apartments into 3D models and floor plans.">
+  <meta property="og:image" content="assets/icon-512.png">
+  <style>
+    :root {
+      --bg: #07080f;
+      --bg-2: #0f1224;
+      --card: rgba(255, 255, 255, 0.055);
+      --card-stroke: rgba(255, 255, 255, 0.09);
+      --text: #f4f5fb;
+      --muted: #a4a9c0;
+      --accent: #6b73ff;
+      --accent-2: #3dd6f5;
+      --ok: #4cd98b;
+      --warn: #ffbd4d;
+      --radius: 20px;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1200px 600px at 50% -200px, rgba(107, 115, 255, 0.28), transparent 70%),
+        linear-gradient(180deg, var(--bg-2), var(--bg) 480px);
+      background-color: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px);
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    a { color: var(--accent-2); }
+    .hero { text-align: center; padding: 48px 0 26px; }
+    .app-icon {
+      width: 116px; height: 116px; border-radius: 26px;
+      box-shadow: 0 18px 48px rgba(107, 115, 255, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+    h1 { font-size: 34px; letter-spacing: -0.02em; margin: 18px 0 6px; }
+    .tagline { color: var(--muted); margin: 0 auto; max-width: 440px; font-size: 17px; }
+    .meta { margin-top: 14px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
+      background: var(--card); border: 1px solid var(--card-stroke); font-size: 13px; color: var(--muted);
+    }
+    .pill.ok { color: var(--ok); }
+    .card {
+      background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--radius);
+      padding: 20px; margin: 14px 0;
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    }
+    h2 { font-size: 20px; margin: 0 0 12px; letter-spacing: -0.01em; }
+    h3 { font-size: 16px; margin: 0 0 4px; }
+    p { margin: 0 0 10px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      min-height: 54px; padding: 12px 18px; border-radius: 16px; border: 0;
+      font: 600 17px/1.2 inherit; font-family: inherit; text-decoration: none; cursor: pointer;
+      color: var(--text); background: rgba(255, 255, 255, 0.09); border: 1px solid var(--card-stroke);
+      -webkit-tap-highlight-color: transparent; transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .btn:active { transform: scale(0.98); filter: brightness(1.1); }
+    .btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: 0; color: #fff;
+      box-shadow: 0 10px 30px rgba(107, 115, 255, 0.4);
+    }
+    .btn small { font-weight: 500; opacity: 0.8; font-size: 13px; white-space: nowrap; }
+    .btn svg { width: 20px; height: 20px; flex: none; }
+    .stack { display: grid; gap: 10px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .option + .option { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--card-stroke); }
+    .badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(76, 217, 139, 0.14); color: var(--ok); }
+    .badge.warn { background: rgba(255, 189, 77, 0.14); color: var(--warn); }
+    ol.steps { margin: 10px 0 0; padding-left: 22px; color: var(--muted); font-size: 14px; }
+    ol.steps li { margin: 4px 0; }
+    ol.steps b { color: var(--text); font-weight: 600; }
+    details { border-top: 1px solid var(--card-stroke); padding: 12px 0 2px; }
+    details:first-of-type { border-top: 0; padding-top: 0; }
+    summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--muted); font-weight: 400; font-size: 20px; line-height: 1; }
+    details[open] summary::after { content: "–"; }
+    details > div { color: var(--muted); font-size: 14px; padding: 8px 0 6px; }
+    .features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+    .feature { background: var(--card); border: 1px solid var(--card-stroke); border-radius: 18px; padding: 16px; }
+    .feature .icon { font-size: 24px; line-height: 1; }
+    .feature h3 { margin-top: 10px; font-size: 15px; }
+    .feature p { font-size: 13px; color: var(--muted); margin: 0; }
+    .qr { display: flex; gap: 18px; align-items: center; }
+    .qr-code { background: #fff; border-radius: 14px; padding: 10px; width: 160px; height: 160px; flex: none; display: grid; place-items: center; }
+    .qr-code svg, .qr-code img { width: 100%; height: 100%; }
+    .source { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+    .source code {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;
+      background: rgba(0, 0, 0, 0.35); border: 1px solid var(--card-stroke); padding: 10px 12px; border-radius: 12px; color: var(--muted);
+    }
+    .source button { min-height: 40px; width: auto; padding: 0 14px; font-size: 14px; border-radius: 12px; }
+    footer { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0 8px; }
+    .error { color: var(--warn); }
+    @media (max-width: 340px) {
+      .features { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      .qr { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <img class="app-icon" src="assets/icon-512.png" alt="ScanSpace app icon" width="116" height="116">
+      <h1>ScanSpace</h1>
+      <p class="tagline">Turn your iPhone’s LiDAR into a 3D scanner — capture rooms, whole apartments and objects.</p>
+      <div class="meta" id="meta"><span class="pill">Loading latest build…</span></div>
+    </header>
+
+    <main>
+      <section class="card" id="desktop" hidden>
+        <h2>Open this page on your iPhone</h2>
+        <div class="qr">
+          <div class="qr-code" id="qr" aria-label="QR code for this page"></div>
+          <p class="muted">Scan the code with your iPhone’s camera, or open <a id="page-link" href="#"></a> in Safari. Installing needs an iPhone with a LiDAR Scanner (12&nbsp;Pro or newer Pro model).</p>
+        </div>
+      </section>
+
+      <section class="card" id="install">
+        <h2>Install</h2>
+        <div id="options"><p class="muted">Loading install options…</p></div>
+      </section>
+
+      <div class="features">
+        <div class="feature"><div class="icon">🧊</div><h3>LiDAR mesh</h3><p>Photo-textured 3D models of rooms and objects.</p></div>
+        <div class="feature"><div class="icon">🏠</div><h3>Whole apartments</h3><p>RoomPlan scans, room by room, merged into one model.</p></div>
+        <div class="feature"><div class="icon">📐</div><h3>Floor plans</h3><p>Dimensioned 2D plans with room areas, as PDF or PNG.</p></div>
+        <div class="feature"><div class="icon">📏</div><h3>Measure</h3><p>Tap two points anywhere on a scan to measure.</p></div>
+        <div class="feature"><div class="icon">🥽</div><h3>View in AR</h3><p>Drop your scan into the real world with AR Quick Look.</p></div>
+        <div class="feature"><div class="icon">📦</div><h3>Export</h3><p>GLB, USDZ, OBJ, PLY, STL, point clouds &amp; raw data.</p></div>
+      </div>
+
+      <section class="card">
+        <h2>Questions</h2>
+        <details>
+          <summary>Why isn’t this in the App Store?</summary>
+          <div>ScanSpace is installed straight from this page. iOS still requires every app to be signed by an Apple account: the one-tap button uses the owner’s developer signature (your iPhone must be registered for it), while SideStore and AltStore sign the app with your own free Apple ID.</div>
+        </details>
+        <details>
+          <summary>“Unable to install” or “integrity could not be verified”</summary>
+          <div>The one-tap build only installs on iPhones whose UDID is in the signing profile. Ask the owner to add your device, or use the SideStore / AltStore option instead.</div>
+        </details>
+        <details>
+          <summary>“Developer Mode required”</summary>
+          <div>Open <b>Settings › Privacy &amp; Security › Developer Mode</b>, switch it on and restart when asked. It’s needed for apps signed with a free Apple ID.</div>
+        </details>
+        <details>
+          <summary>The app stopped opening after a week</summary>
+          <div>Apps signed with a free Apple ID expire after 7 days. Open SideStore or AltStore and tap <b>Refresh</b> (AltStore can refresh automatically when AltServer runs on your computer on the same Wi-Fi). Your scans stay on the phone.</div>
+        </details>
+        <details>
+          <summary>Which iPhones work?</summary>
+          <div>Any iPhone or iPad with a LiDAR Scanner on iOS 17 or later: iPhone 12 Pro / Pro Max and every newer Pro model (including the iPhone 15 Pro), and iPad Pro 2020 or newer.</div>
+        </details>
+        <details>
+          <summary>Is my data uploaded anywhere?</summary>
+          <div>No. Scanning, processing and exporting all happen on your iPhone. Nothing leaves it unless you share an export.</div>
+        </details>
+      </section>
+    </main>
+
+    <footer id="footer">ScanSpace</footer>
+  </div>
+
+  <script>
+    (function () {
+      var page = location.href.split('#')[0].split('?')[0].replace(/index\.html$/, '');
+      var ua = navigator.userAgent;
+      var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      var icons = {
+        download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
+        plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+        copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+      };
+
+      function el(id) { return document.getElementById(id); }
+      function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+      function mb(bytes) { return (bytes / 1048576).toFixed(1) + ' MB'; }
+      function date(iso) {
+        try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return iso; }
+      }
+
+      if (!isIOS) {
+        el('desktop').hidden = false;
+        el('page-link').textContent = page;
+        el('page-link').href = page;
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+        script.onload = function () {
+          var qr = window.qrcode(0, 'M');
+          qr.addData(page);
+          qr.make();
+          el('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+        };
+        script.onerror = function () { el('qr').innerHTML = '<span style="color:#333;font-size:12px;text-align:center">Open the link on your iPhone</span>'; };
+        document.head.appendChild(script);
+      }
+
+      function render(release) {
+        var meta = '<span class="pill">Version ' + esc(release.version) + '</span>' +
+          '<span class="pill">' + esc(date(release.date)) + '</span>' +
+          '<span class="pill">iOS ' + esc(release.minOSVersion) + '+ · LiDAR</span>';
+        if (release.signed) meta += '<span class="pill ok">One-tap install ready</span>';
+        el('meta').innerHTML = meta;
+
+        var source = release.source;
+        var altstore = 'altstore://source?url=' + encodeURIComponent(source);
+        var sidestore = 'sidestore://source?url=' + encodeURIComponent(source);
+        var html = '';
+
+        if (release.signed) {
+          var itms = 'itms-services://?action=download-manifest&url=' + encodeURIComponent(release.signed.manifest);
+          html += '<div class="option">' +
+            '<h3>One-tap install <span class="badge">Recommended</span></h3>' +
+            '<p class="muted">Signed by the owner’s Apple Developer account. Works on iPhones registered in its ' + esc(release.signed.method) + ' profile.</p>' +
+            '<div class="stack"><a class="btn primary" href="' + itms + '">' + icons.download + '<span>Install ScanSpace <small>· ' + mb(release.signed.size) + '</small></span></a></div>' +
+            '<ol class="steps"><li>Tap <b>Install</b>, then confirm in the dialog.</li>' +
+            '<li>Go to the Home Screen and wait for the icon to finish loading.</li>' +
+            '<li>If iOS asks for it, switch on <b>Settings › Privacy &amp; Security › Developer Mode</b>.</li></ol>' +
+            '</div>';
+        }
+
+        html += '<div class="option">' +
+          '<h3>Free install with your Apple ID' + (release.signed ? '' : ' <span class="badge">Works on any LiDAR iPhone</span>') + '</h3>' +
+          '<p class="muted">Use SideStore or AltStore to sign ScanSpace with your own free Apple ID. Add this page’s source once and you’ll get updates automatically.</p>' +
+          '<div class="row">' +
+          '<a class="btn' + (release.signed ? '' : ' primary') + '" href="' + sidestore + '">' + icons.plus + '<span>SideStore</span></a>' +
+          '<a class="btn' + (release.signed ? '' : ' primary') + '" href="' + altstore + '">' + icons.plus + '<span>AltStore</span></a>' +
+          '</div>' +
+          '<div class="source"><code id="source-url">' + esc(source) + '</code><button class="btn" id="copy">' + icons.copy + 'Copy</button></div>' +
+          '<ol class="steps">' +
+          '<li>Install <a href="https://sidestore.io" target="_blank" rel="noopener">SideStore</a> or <a href="https://altstore.io" target="_blank" rel="noopener">AltStore</a> on your iPhone (one-time setup with a Mac or PC).</li>' +
+          '<li>Tap its button above (or paste the source URL under <b>Sources › +</b>), then install <b>ScanSpace</b>.</li>' +
+          '<li>Switch on <b>Settings › Privacy &amp; Security › Developer Mode</b> when iOS asks.</li>' +
+          '<li>Free Apple IDs sign apps for 7 days — refresh in SideStore/AltStore each week.</li>' +
+          '</ol></div>';
+
+        html += '<div class="option">' +
+          '<h3>Download the IPA</h3>' +
+          '<p class="muted">Unsigned build for <a href="https://sideloadly.io" target="_blank" rel="noopener">Sideloadly</a>, AltStore’s “+” button or your own re-signing tools.</p>' +
+          '<a class="btn" href="' + esc(release.unsigned.url) + '" download>' + icons.download + '<span>ScanSpace-unsigned.ipa <small>· ' + mb(release.unsigned.size) + '</small></span></a>' +
+          '</div>';
+
+        el('options').innerHTML = html;
+        el('copy').addEventListener('click', function () {
+          var button = this;
+          var done = function () { button.lastChild.textContent = 'Copied'; setTimeout(function () { button.lastChild.textContent = 'Copy'; }, 1600); };
+          if (navigator.clipboard) { navigator.clipboard.writeText(source).then(done, done); } else { done(); }
+        });
+
+        var footer = 'ScanSpace ' + esc(release.version) + ' (build ' + esc(release.build) + (release.commit ? ', ' + esc(release.commit) : '') + ')';
+        if (release.repository) footer += ' · <a href="' + esc(release.repository) + '">Source on GitHub</a>';
+        el('footer').innerHTML = footer;
+      }
+
+      fetch('release.json', { cache: 'no-store' })
+        .then(function (response) { if (!response.ok) throw new Error(response.status); return response.json(); })
+        .then(render)
+        .catch(function () {
+          el('meta').innerHTML = '<span class="pill">No build published yet</span>';
+          el('options').innerHTML = '<p class="error">The first build hasn’t been published yet. Check back after the GitHub Actions workflow finishes.</p>';
+        });
+    })();
+  </script>
+</body>
+</html>
