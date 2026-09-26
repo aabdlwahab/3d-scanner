@@ -222,7 +222,8 @@ final class ViewportCoordinator: NSObject, SCNSceneRendererDelegate {
             appliedPlan = session.planRevision
             planNode.childNodes.forEach { $0.removeFromParentNode() }
             if let plan = session.floorPlan {
-                let node = RoomSceneBuilder.makeNode(for: plan)
+                let node = SceneKitExport.node(for: ProjectSession.planModel(for: plan, look: session.planLook))
+                node.name = "Room"
                 node.enumerateHierarchy { child, _ in child.categoryBitMask = Self.pickable }
                 planNode.addChildNode(node)
             }

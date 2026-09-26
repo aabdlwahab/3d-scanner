@@ -49,7 +49,7 @@ enum GLBWriter {
             let view = addBufferView(bytes, target: nil)
             let mime = textureURL.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
             images.append(["bufferView": view, "mimeType": mime, "name": textureURL.deletingPathExtension().lastPathComponent])
-            textures.append(["sampler": 0, "source": images.count - 1])
+            textures.append(["sampler": material.repeats ? 1 : 0, "source": images.count - 1])
             textureIndexForMaterial[i] = textures.count - 1
         }
 
@@ -59,8 +59,8 @@ enum GLBWriter {
             let linear = ColorSpaceMath.linear(SIMD3(material.baseColor.x, material.baseColor.y, material.baseColor.z))
             var pbr: [String: Any] = [
                 "baseColorFactor": [Double(linear.x), Double(linear.y), Double(linear.z), Double(material.baseColor.w)],
-                "metallicFactor": 0.0,
-                "roughnessFactor": 1.0,
+                "metallicFactor": Double(material.metalness),
+                "roughnessFactor": Double(material.roughness),
             ]
             if let texture = textureIndexForMaterial[i] { pbr["baseColorTexture"] = ["index": texture] }
             var json: [String: Any] = ["name": material.name, "pbrMetallicRoughness": pbr, "doubleSided": material.doubleSided]
@@ -131,8 +131,10 @@ enum GLBWriter {
         if !images.isEmpty {
             json["images"] = images
             json["textures"] = textures
-            // Linear filtering with trilinear mipmaps; clamp so atlas charts never wrap.
-            json["samplers"] = [["magFilter": 9729, "minFilter": 9987, "wrapS": 33071, "wrapT": 33071]]
+            // Linear filtering with trilinear mipmaps; clamp so atlas charts never wrap (sampler 0),
+            // repeat for tiled materials (sampler 1).
+            json["samplers"] = [["magFilter": 9729, "minFilter": 9987, "wrapS": 33071, "wrapT": 33071],
+                                ["magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497]]
         }
         if usesUnlit { json["extensionsUsed"] = ["KHR_materials_unlit"] }
 

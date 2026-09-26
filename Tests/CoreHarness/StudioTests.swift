@@ -54,6 +54,31 @@ func runStudioTests(output: URL, check: (Bool, String) -> Void) throws {
     renderRoom(node: SCNNode(geometry: assets.geometry(for: .textured)), bounds: assets.bounds,
                to: output.appendingPathComponent("apartment-textured.png"))
 
+    // MARK: Furnished model from a plan
+
+    let furnishedPlan = apartment.furnishedPlan()
+    start = Date()
+    let blocks = RoomSceneBuilder.makeModel(for: furnishedPlan)
+    let furnished = FurnishedModelBuilder.makeModel(for: furnishedPlan, style: .scandinavian)
+    print(String(format: "  furnished model            %.2fs (%d triangles, %d materials)", Date().timeIntervalSince(start),
+                 furnished.triangleCount, furnished.materials.count))
+    let furnishedMesh = furnished.meshes.first
+    check(furnished.triangleCount > blocks.triangleCount * 5, "furnished model has detail (\(furnished.triangleCount) vs \(blocks.triangleCount) triangles)")
+    check(furnishedMesh?.hasUVs == true && furnishedMesh?.hasNormals == true, "furnished model has normals and texture coordinates")
+    let tiledMaterials = furnished.materials.filter { $0.texture != nil }
+    check(tiledMaterials.count >= 8 && tiledMaterials.allSatisfy { $0.repeats && FileManager.default.fileExists(atPath: $0.texture!.path) },
+          "furnished materials use \(tiledMaterials.count) generated tiling textures")
+    check(furnishedMesh.map { $0.primitives.allSatisfy { $0.indices.allSatisfy { Int($0) < furnishedMesh!.positions.count } } } ?? false,
+          "furnished model indices are valid")
+    let furnishedBox = furnished.bounds, blocksBox = blocks.bounds
+    check(simd_distance(furnishedBox.min, blocksBox.min) < 0.3 && simd_distance(furnishedBox.max, blocksBox.max) < 0.3,
+          "furnished model keeps the plan's extent")
+    let furnishedGLB = output.appendingPathComponent("furnished.glb")
+    try GLBWriter.write(furnished, to: furnishedGLB)
+    let glbSize = (try? FileManager.default.attributesOfItem(atPath: furnishedGLB.path)[.size] as? Int) ?? 0
+    check(glbSize > 500_000, "furnished GLB written with embedded textures (\(glbSize / 1024) KB)")
+    renderRoom(node: SceneKitExport.node(for: furnished), bounds: furnished.bounds, to: output.appendingPathComponent("furnished-3d.png"))
+
     // MARK: Blueprint from an unlabelled point cloud
 
     var rng = SampleRandom(seed: 5)

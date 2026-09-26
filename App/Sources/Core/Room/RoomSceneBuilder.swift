@@ -89,22 +89,31 @@ enum RoomSceneBuilder {
     }
 
     /// Whether a door/window/opening sits in a wall (RoomPlan parent link, or geometric fallback).
-    private static func belongs(_ hole: FloorPlanData.Surface, to wall: FloorPlanData.Surface, inverse: simd_float4x4) -> Bool {
+    static func belongs(_ hole: FloorPlanData.Surface, to wall: FloorPlanData.Surface, inverse: simd_float4x4) -> Bool {
         if let parent = hole.parentID { return parent == wall.id }
         let c = (inverse * hole.matrix).translation
         return abs(c.z) < 0.2 && abs(c.x) < wall.size.x / 2 + 0.05 && abs(c.y) < wall.size.y / 2 + 0.05
     }
 }
 
-/// Accumulates triangles per material into a single ``ExportModel`` mesh.
-private struct ModelBuilder {
+/// Accumulates triangles per material into a single ``ExportModel`` mesh. Texture coordinates
+/// are planar in meters (divided by each material's tile size), picked by the face direction.
+struct ModelBuilder {
     private var positions: [SIMD3<Float>] = []
     private var normals: [SIMD3<Float>] = []
+    private var uvs: [SIMD2<Float>] = []
     private var indicesByMaterial: [[UInt32]] = []
     private var materials: [ExportModel.Material] = []
+    private var tiles: [Float] = []
 
-    mutating func material(_ name: String, color: SIMD4<Float>, doubleSided: Bool = false) -> Int {
-        materials.append(ExportModel.Material(name: name, baseColor: color, doubleSided: doubleSided))
+    mutating func material(_ name: String, color: SIMD4<Float>, doubleSided: Bool = false, texture: URL? = nil,
+                           tile: Float = 1, roughness: Float = 1, metalness: Float = 0) -> Int {
+        var material = ExportModel.Material(name: name, baseColor: color, texture: texture, doubleSided: doubleSided)
+        material.repeats = texture != nil
+        material.roughness = roughness
+        material.metalness = metalness
+        materials.append(material)
+        tiles.append(tile)
         indicesByMaterial.append([])
         return materials.count - 1
     }
@@ -115,9 +124,28 @@ private struct ModelBuilder {
         let primitives = indicesByMaterial.enumerated().filter { !$0.element.isEmpty }
             .map { ExportModel.Primitive(indices: $0.element, material: $0.offset) }
         if !primitives.isEmpty {
-            model.meshes = [ExportModel.Mesh(name: name, positions: positions, normals: normals, primitives: primitives)]
+            let textured = materials.contains { $0.texture != nil }
+            model.meshes = [ExportModel.Mesh(name: name, positions: positions, normals: normals, uvs: textured ? uvs : [], primitives: primitives)]
         }
         return model
+    }
+
+    private func uv(_ p: SIMD3<Float>, _ n: SIMD3<Float>, _ material: Int) -> SIMD2<Float> {
+        let a = abs(n), tile = max(tiles[material], 0.01)
+        let q: SIMD2<Float> = a.y >= a.x && a.y >= a.z ? SIMD2(p.x, p.z) : a.x >= a.z ? SIMD2(p.z, -p.y) : SIMD2(p.x, -p.y)
+        return q / tile
+    }
+
+    /// Adds a vertex and returns its index.
+    mutating func vertex(_ p: SIMD3<Float>, _ n: SIMD3<Float>, material: Int) -> UInt32 {
+        positions.append(p)
+        normals.append(n)
+        uvs.append(uv(p, n, material))
+        return UInt32(positions.count - 1)
+    }
+
+    mutating func triangle(_ a: UInt32, _ b: UInt32, _ c: UInt32, material: Int) {
+        indicesByMaterial[material] += [a, b, c]
     }
 
     /// Adds a planar quad (corners counter-clockwise when seen from the side `normal` points to).
@@ -125,7 +153,38 @@ private struct ModelBuilder {
         let base = UInt32(positions.count)
         positions += [a, b, c, d]
         normals += [normal, normal, normal, normal]
+        uvs += [uv(a, normal, material), uv(b, normal, material), uv(c, normal, material), uv(d, normal, material)]
         indicesByMaterial[material] += [base, base + 1, base + 2, base, base + 2, base + 3]
+    }
+
+    /// A box between `lo` and `hi` in the local frame of `m`.
+    mutating func addBox(_ lo: SIMD3<Float>, _ hi: SIMD3<Float>, in m: simd_float4x4, material: Int) {
+        var t = m
+        t.columns.3 = SIMD4(m.transformPoint((lo + hi) / 2), 1)
+        addBox(size: hi - lo, transform: t, material: material)
+    }
+
+    /// A vertical cylinder standing on `base` (local frame of `m`), capped at both ends.
+    mutating func addCylinder(base: SIMD3<Float>, radius: Float, height: Float, in m: simd_float4x4, material: Int, segments: Int = 16) {
+        let r = m.upperLeft3x3
+        let up = simd_normalize(r * SIMD3(0, 1, 0))
+        func p(_ angle: Float, _ y: Float) -> SIMD3<Float> {
+            m.transformPoint(base + SIMD3(cos(angle) * radius, y, sin(angle) * radius))
+        }
+        for i in 0..<segments {
+            let a0 = Float(i) / Float(segments) * 2 * .pi, a1 = Float(i + 1) / Float(segments) * 2 * .pi
+            let n0 = simd_normalize(r * SIMD3(cos(a0), 0, sin(a0))), n1 = simd_normalize(r * SIMD3(cos(a1), 0, sin(a1)))
+            let v0 = vertex(p(a0, 0), n0, material: material), v1 = vertex(p(a1, 0), n1, material: material)
+            let v2 = vertex(p(a1, height), n1, material: material), v3 = vertex(p(a0, height), n0, material: material)
+            triangle(v0, v3, v2, material: material)
+            triangle(v0, v2, v1, material: material)
+            let top = vertex(m.transformPoint(base + SIMD3(0, height, 0)), up, material: material)
+            let t0 = vertex(p(a0, height), up, material: material), t1 = vertex(p(a1, height), up, material: material)
+            triangle(top, t1, t0, material: material)
+            let bottom = vertex(m.transformPoint(base), -up, material: material)
+            let b0 = vertex(p(a0, 0), -up, material: material), b1 = vertex(p(a1, 0), -up, material: material)
+            triangle(bottom, b0, b1, material: material)
+        }
     }
 
     mutating func addBox(size: SIMD3<Float>, transform m: simd_float4x4, material: Int) {
@@ -208,10 +267,12 @@ private struct ModelBuilder {
             let b = SIMD3(points[tri.1].x, top, points[tri.1].y)
             var c = SIMD3(points[tri.2].x, top, points[tri.2].y)
             if simd_cross(b - a, c - a).y < 0 { swap(&a, &c) }
-            let base = UInt32(positions.count)
-            positions += [a, b, c, SIMD3(a.x, bottom, a.z), SIMD3(c.x, bottom, c.z), SIMD3(b.x, bottom, b.z)]
-            normals += [SIMD3(0, 1, 0), SIMD3(0, 1, 0), SIMD3(0, 1, 0), SIMD3(0, -1, 0), SIMD3(0, -1, 0), SIMD3(0, -1, 0)]
-            indicesByMaterial[material] += [base, base + 1, base + 2, base + 3, base + 4, base + 5]
+            let up = SIMD3<Float>(0, 1, 0), down = SIMD3<Float>(0, -1, 0)
+            let i0 = vertex(a, up, material: material), i1 = vertex(b, up, material: material), i2 = vertex(c, up, material: material)
+            triangle(i0, i1, i2, material: material)
+            let j0 = vertex(SIMD3(a.x, bottom, a.z), down, material: material), j1 = vertex(SIMD3(c.x, bottom, c.z), down, material: material)
+            let j2 = vertex(SIMD3(b.x, bottom, b.z), down, material: material)
+            triangle(j0, j1, j2, material: material)
         }
         for i in points.indices {
             let a = points[i], b = points[(i + 1) % points.count]

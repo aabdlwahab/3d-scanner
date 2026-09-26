@@ -275,8 +275,20 @@ private struct BlueprintPanel: View {
             }
 
             if session.floorPlan != nil {
+                Section("3D Model from Plan") {
+                    Picker("Look", selection: $session.planLook) {
+                        Text("Simple blocks").tag("simple")
+                        ForEach(FurnishingStyle.all) { Text("Furnished · \($0.title)").tag($0.id) }
+                    }
+                    Text("Furnished turns every scanned object into a detailed piece of furniture and adds floors, paint, door and window frames. Used by the 3D view and the GLB / USDZ exports.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Show 3D") {
+                        session.mode = .model
+                        session.style = .plan
+                    }
+                }
                 Section("Export Plan") {
-                    ForEach([StudioExport.planPDF, .planSVG, .planDXF, .planPNG, .planGLB], id: \.self) { kind in
+                    ForEach([StudioExport.planPDF, .planSVG, .planDXF, .planPNG, .planGLB, .planUSDZ], id: \.self) { kind in
                         Button(kind.title) { export(kind) }
                     }
                 }

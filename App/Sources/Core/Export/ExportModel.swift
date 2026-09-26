@@ -14,6 +14,10 @@ struct ExportModel {
         var doubleSided = false
         /// Whether the mesh's vertex colors should color this material.
         var usesVertexColors = false
+        /// Tiled textures (floors, walls) repeat; scan atlases are clamped.
+        var repeats = false
+        var roughness: Float = 1
+        var metalness: Float = 0
     }
 
     struct Primitive {

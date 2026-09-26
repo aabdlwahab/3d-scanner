@@ -57,14 +57,18 @@ enum SceneKitExport {
         let m = SCNMaterial()
         m.name = material.name
         m.lightingModel = .physicallyBased
-        m.roughness.contents = 1.0
-        m.metalness.contents = 0.0
+        m.roughness.contents = CGFloat(material.roughness)
+        m.metalness.contents = CGFloat(material.metalness)
         m.isDoubleSided = material.doubleSided
         if let texture = material.texture {
             m.diffuse.contents = texture
-            m.diffuse.wrapS = .clamp
-            m.diffuse.wrapT = .clamp
+            m.diffuse.wrapS = material.repeats ? .repeat : .clamp
+            m.diffuse.wrapT = material.repeats ? .repeat : .clamp
             m.diffuse.mipFilter = .linear
+            // The base color tints the texture (white leaves it as is).
+            if material.baseColor.x < 0.999 || material.baseColor.y < 0.999 || material.baseColor.z < 0.999 {
+                m.multiply.contents = PlatformColor(rgb: SIMD3(material.baseColor.x, material.baseColor.y, material.baseColor.z))
+            }
         } else {
             // USD viewers generally ignore vertex colors, so fall back to their average.
             let rgb = material.usesVertexColors ? vertexColorFallback : SIMD3(material.baseColor.x, material.baseColor.y, material.baseColor.z)

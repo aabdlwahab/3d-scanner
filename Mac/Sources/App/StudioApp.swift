@@ -61,6 +61,7 @@ final class StudioAppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--snapshot") {
             Task { @MainActor in await SnapshotRunner.run() }
         }
+        if AIEvalRunner.isRequested { AIEvalRunner.run() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

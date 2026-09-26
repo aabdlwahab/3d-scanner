@@ -196,6 +196,13 @@ final class ProjectSession {
     var cropMin = SIMD3<Float>(repeating: -1)
     var cropMax = SIMD3<Float>(repeating: 1)
     var blueprintOptions = BlueprintOptions()
+    /// Look of the 3D model built from the floor plan: a furnishing style id, or "simple" for blocks.
+    var planLook: String = UserDefaults.standard.string(forKey: "planLook") ?? FurnishingStyle.scandinavian.id {
+        didSet {
+            UserDefaults.standard.set(planLook, forKey: "planLook")
+            planRevision += 1
+        }
+    }
     var textureQuality: StudioTextureQuality = .high
     var buildPointCloud = true
 
@@ -214,6 +221,14 @@ final class ProjectSession {
     private var blueprintURL: URL { files.root.appendingPathComponent("blueprint.json") }
 
     var isBusy: Bool { busy != nil }
+
+    /// The 3D model built from a floor plan in the chosen look.
+    nonisolated static func planModel(for plan: FloorPlanData, look: String) -> ExportModel {
+        if let style = FurnishingStyle.all.first(where: { $0.id == look }) {
+            return FurnishedModelBuilder.makeModel(for: plan, style: style)
+        }
+        return RoomSceneBuilder.makeModel(for: plan)
+    }
     var canProcess: Bool { files.hasRawCapture }
     var hasGeometry: Bool { mesh != nil || cloud != nil }
     var floorPlan: FloorPlanData? { scan.kind == .room ? roomPlan : blueprint?.plan }
@@ -556,7 +571,7 @@ final class ProjectSession {
             return
         }
         let mesh = mesh, cloud = cloud, plan = floorPlan, textureURLs = files.textureURLs(count: mesh?.textureCount ?? 0)
-        let title = scan.name
+        let title = scan.name, look = planLook
         try await Task.detached(priority: .userInitiated) {
             func meshModel() throws -> ExportModel {
                 if let mesh { return ExportModel(textured: mesh, textureURLs: textureURLs, name: name) }
@@ -565,7 +580,7 @@ final class ProjectSession {
             }
             func planModel() throws -> ExportModel {
                 guard let plan else { throw ExportError.missingData("floor plan") }
-                return RoomSceneBuilder.makeModel(for: plan)
+                return ProjectSession.planModel(for: plan, look: look)
             }
             switch kind {
             case .glb: try GLBWriter.write(try meshModel(), to: url)
