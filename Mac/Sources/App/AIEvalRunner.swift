@@ -33,6 +33,32 @@ enum AIEvalRunner {
         Thread.detachNewThread {
             do {
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+                if let project = value("--reprocess") {
+                    // Re-bake a (copied) project, then render it from a few capture cameras.
+                    let files = ScanFiles(root: URL(fileURLWithPath: project, isDirectory: true))
+                    let count = Int(value("--views-count") ?? "6") ?? 6
+                    func renderViews(_ suffix: String) throws {
+                        let mesh = try TexturedMesh.read(from: files.texturedMesh)
+                        let assets = TexturedMeshAssets(mesh: mesh, textureURLs: files.textureURLs(count: mesh.textureCount))
+                        let scan = SCNNode(geometry: assets.geometry(for: .textured))
+                        let index = try KeyframeIndex.read(from: files.framesIndex)
+                        for (i, view) in ScanRetexture.views(index, count: count, width: 768, height: 512).enumerated() {
+                            try ImageFiles.writePNG(try ScanRetexture.render(scan, camera: view.camera).color,
+                                                    to: output.appendingPathComponent(String(format: "view-%02d-\(suffix).png", i)))
+                        }
+                    }
+                    try renderViews("before")
+                    let start = Date()
+                    _ = try ScanProcessor(files: files, options: ProcessingOptions(maxTexturePages: 4, texturePageSize: 4096, buildPointCloud: false))
+                        .run { p in if Int(p.fraction * 100) % 10 == 0 { print(String(format: "%3.0f%% %@", p.fraction * 100, p.stage)) } }
+                    print(String(format: "processed in %.0fs", Date().timeIntervalSince(start)))
+                    try renderViews("after")
+                    exit(0)
+                }
+                if let count = value("--retexture-probe").flatMap(Int.init), let project = value("--project") {
+                    try retextureProbe(project: project, count: count, output: output, steps: steps)
+                    exit(0)
+                }
                 var plan = SyntheticApartment.standard().furnishedPlan()
                 var scanNode: SCNNode?
                 if let project = value("--project") {
@@ -118,6 +144,37 @@ enum AIEvalRunner {
             } catch {
                 print("ai-eval failed: \(error.localizedDescription)")
                 exit(1)
+            }
+        }
+    }
+
+    /// Renders the scan from `count` capture cameras and cleans each render with SD image-to-image.
+    private static func retextureProbe(project: String, count: Int, output: URL, steps: Int) throws {
+        let files = ScanFiles(root: URL(fileURLWithPath: project, isDirectory: true))
+        let mesh = try TexturedMesh.read(from: files.texturedMesh)
+        let assets = TexturedMeshAssets(mesh: mesh, textureURLs: files.textureURLs(count: mesh.textureCount))
+        let scan = SCNNode(geometry: assets.geometry(for: .textured))
+        let index = try KeyframeIndex.read(from: files.framesIndex)
+        let pipeline = try PlanDiffusion(directory: AIModels.stableDiffusionDirectory)
+        let views = ScanRetexture.views(index, count: count, width: 768, height: 512)
+        for (i, view) in views.enumerated() {
+            let (color, depth) = try ScanRetexture.render(scan, camera: view.camera)
+            let name = String(format: "view-%02d", i)
+            try ImageFiles.writePNG(color, to: output.appendingPathComponent("\(name)-render.png"))
+            try ImageFiles.writePNG(depth, to: output.appendingPathComponent("\(name)-depth.png"))
+            if let photo = ScanRetexture.photo(view, files: files) {
+                try ImageFiles.writePNG(photo, to: output.appendingPathComponent("\(name)-photo.png"))
+            }
+            for strength: Float in [0.4, 0.6] {
+                let start = Date()
+                let request = PlanDiffusion.Request(
+                    prompt: "RAW photo of a clean empty apartment room, smooth plastered walls, even natural daylight, neutral white balance, realistic, sharp, highly detailed",
+                    negativePrompt: RenderPrompts.negative + ", holes, smeared, stretched texture, noise, orange tint",
+                    controls: [.init(model: "Depth-7x5", image: depth, weight: 0.9, end: 1)],
+                    seed: 7, steps: steps, guidance: 6, startingImage: color, strength: strength)
+                let image = try pipeline.generate(request)
+                try ImageFiles.writePNG(image, to: output.appendingPathComponent("\(name)-sd-\(Int(strength * 100)).png"))
+                print(String(format: "%@ strength %.1f: %.1fs", name, strength, Date().timeIntervalSince(start)))
             }
         }
     }

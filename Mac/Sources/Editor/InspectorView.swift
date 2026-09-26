@@ -342,6 +342,16 @@ private struct ProcessPanel: View {
                         ForEach(StudioTextureQuality.allCases) { Text($0.title).tag($0) }
                     }
                     Toggle("Build point cloud", isOn: $session.buildPointCloud)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Neutral white balance")
+                            Spacer()
+                            Text(session.whiteBalance < 0.05 ? "Off" : "\(Int(session.whiteBalance * 100))%").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        Slider(value: $session.whiteBalance, in: 0...1)
+                        Text("Photos are always matched to each other so walls don't look patchy; this also removes the tint of warm or cool lamps.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Button {
                         Task { await session.process() }
                     } label: {

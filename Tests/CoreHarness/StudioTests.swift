@@ -54,6 +54,39 @@ func runStudioTests(output: URL, check: (Bool, String) -> Void) throws {
     renderRoom(node: SCNNode(geometry: assets.geometry(for: .textured)), bounds: assets.bounds,
                to: output.appendingPathComponent("apartment-textured.png"))
 
+    // MARK: Photo color matching
+
+    do {
+        // Brighten every other keyframe by 35% (as if the camera's exposure drifted) and check the
+        // solver asks for the inverse.
+        let drift = ScanFiles(root: output.appendingPathComponent("apartment-drift", isDirectory: true))
+        try? FileManager.default.removeItem(at: drift.root)
+        try FileManager.default.copyItem(at: files.root, to: drift.root)
+        var frames = try ProcessingFrame.load(files: drift)
+        for frame in frames where frame.index % 2 == 1 {
+            if let image = ImageFiles.loadImage(frame.imageURL) {
+                try ImageFiles.writeJPEG(ColorHarmonizer.apply(SIMD3(repeating: 1.35), to: image), to: frame.imageURL, quality: 0.95)
+            }
+        }
+        frames = try ProcessingFrame.load(files: drift)
+        let cleaned = MeshCleaner.clean(try RawMesh.read(from: drift.rawMesh))
+        let adjacency = MeshCleaner.edgeAdjacency(indices: cleaned.indices)
+        let normals = MeshMath.faceNormalsAndAreas(positions: cleaned.positions, indices: cleaned.indices).normals
+        let labels = ViewSelector(positions: cleaned.positions, indices: cleaned.indices, faceNormals: normals, frames: frames)
+            .select(adjacency: adjacency) { _ in }.labels
+        start = Date()
+        let gains = ColorHarmonizer.gains(positions: cleaned.positions, indices: cleaned.indices, adjacency: adjacency, labels: labels,
+                                          frames: frames, options: ColorHarmonizer.Options(neutralize: 0))
+        print(String(format: "  color matching             %.2fs", Date().timeIntervalSince(start)))
+        let used = Set(labels.filter { $0 >= 0 }.map(Int.init))
+        func mean(_ odd: Bool) -> Float {
+            let g = used.filter { frames[$0].index % 2 == (odd ? 1 : 0) }.map { (gains[$0].x + gains[$0].y + gains[$0].z) / 3 }
+            return g.reduce(0, +) / Float(max(1, g.count))
+        }
+        let ratio = mean(true) / mean(false)
+        check(abs(ratio - 1 / 1.35) < 0.08, String(format: "color matching undoes a 35%% exposure drift (gain ratio %.2f, ideal %.2f)", ratio, 1 / 1.35))
+    }
+
     // MARK: Furnished model from a plan
 
     let furnishedPlan = apartment.furnishedPlan()

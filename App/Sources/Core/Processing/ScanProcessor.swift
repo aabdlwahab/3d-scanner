@@ -5,6 +5,9 @@ struct ProcessingOptions: Codable, Equatable {
     var maxTexturePages = 2
     var texturePageSize = 4096
     var buildPointCloud = true
+    /// How far to correct the scan's overall color cast towards neutral (0...1); photo-to-photo
+    /// brightness and color differences are always evened out.
+    var neutralWhiteBalance: Float = 0.5
 }
 
 struct ProcessingProgress: Equatable {
@@ -65,13 +68,18 @@ final class ScanProcessor {
             report(ProcessingProgress(fraction: 0.10 + 0.35 * p, stage: "Choosing the best photos"))
         }
 
+        report(ProcessingProgress(fraction: 0.43, stage: "Matching photo colors"))
+        let gains = ColorHarmonizer.gains(positions: mesh.positions, indices: mesh.indices, adjacency: adjacency,
+                                          labels: selection.labels, frames: frames,
+                                          options: ColorHarmonizer.Options(neutralize: options.neutralWhiteBalance))
+
         report(ProcessingProgress(fraction: 0.45, stage: "Baking textures"))
         try FileManager.default.createDirectory(at: files.modelDirectory, withIntermediateDirectories: true)
         removeOldTextures()
         var atlasOptions = TextureAtlasOptions()
         atlasOptions.pageSize = options.texturePageSize
         atlasOptions.maxPages = max(1, options.maxTexturePages)
-        let builder = TextureAtlasBuilder(mesh: mesh, frames: frames, labels: selection.labels, options: atlasOptions)
+        let builder = TextureAtlasBuilder(mesh: mesh, frames: frames, labels: selection.labels, options: atlasOptions, gains: gains)
         let textured = try builder.build(textureURL: files.texture) { p in
             report(ProcessingProgress(fraction: 0.45 + 0.4 * p, stage: "Baking textures"))
         }

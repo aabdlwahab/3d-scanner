@@ -39,12 +39,16 @@ final class TextureAtlasBuilder {
     private let frames: [ProcessingFrame]
     private let labels: [Int32]
     private let options: TextureAtlasOptions
+    /// Per-keyframe color gains from ``ColorHarmonizer`` (nil: bake photos unchanged).
+    private let gains: [SIMD3<Float>]?
     /// Projection of each triangle corner into its labeled keyframe (3 per triangle).
     private var projected: [SIMD2<Float>]
     /// Source (welded) vertex of every output vertex.
     private var sourceOf: [UInt32] = []
 
-    init(mesh: RawMesh, frames: [ProcessingFrame], labels: [Int32], options: TextureAtlasOptions = TextureAtlasOptions()) {
+    init(mesh: RawMesh, frames: [ProcessingFrame], labels: [Int32], options: TextureAtlasOptions = TextureAtlasOptions(),
+         gains: [SIMD3<Float>]? = nil) {
+        self.gains = gains
         self.mesh = mesh
         self.frames = frames
         self.labels = labels
@@ -316,7 +320,8 @@ final class TextureAtlasBuilder {
         }
         for frame in byFrame.keys.sorted() {
             autoreleasepool {
-                guard let image = ImageFiles.loadImage(frames[frame].imageURL) else { return }
+                guard let loaded = ImageFiles.loadImage(frames[frame].imageURL) else { return }
+                let image = gains.map { ColorHarmonizer.apply($0[frame], to: loaded) } ?? loaded
                 let camera = frames[frame].camera
                 // Keyframe JPEGs are normally stored at camera resolution; tolerate downscaled ones.
                 let ix = Double(image.width) / Double(camera.width)

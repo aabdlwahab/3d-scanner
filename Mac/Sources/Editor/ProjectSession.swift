@@ -205,6 +205,7 @@ final class ProjectSession {
     }
     var textureQuality: StudioTextureQuality = .high
     var buildPointCloud = true
+    var whiteBalance: Double = 0.5
 
     // Status
     private(set) var busy: LibraryJob?
@@ -486,8 +487,9 @@ final class ProjectSession {
         busy = LibraryJob(title: "Preparing…", progress: 0)
         scan.status = .processing
         library?.save(scan)
-        let options = ProcessingOptions(maxTexturePages: textureQuality.pages, texturePageSize: textureQuality.pageSize,
+        var options = ProcessingOptions(maxTexturePages: textureQuality.pages, texturePageSize: textureQuality.pageSize,
                                         buildPointCloud: buildPointCloud)
+        options.neutralWhiteBalance = Float(whiteBalance)
         let files = files
         do {
             let output = try await Task.detached(priority: .userInitiated) {
