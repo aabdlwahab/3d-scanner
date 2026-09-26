@@ -205,7 +205,9 @@ final class ProjectSession {
     }
     var textureQuality: StudioTextureQuality = .high
     var buildPointCloud = true
-    var whiteBalance: Double = 0.5
+    var whiteBalance: Double = 0.3
+    var repairSurfaces = true
+    var paintPlainWalls = true
 
     // Status
     private(set) var busy: LibraryJob?
@@ -490,6 +492,8 @@ final class ProjectSession {
         var options = ProcessingOptions(maxTexturePages: textureQuality.pages, texturePageSize: textureQuality.pageSize,
                                         buildPointCloud: buildPointCloud)
         options.neutralWhiteBalance = Float(whiteBalance)
+        options.repairSurfaces = repairSurfaces
+        options.paintPlainWalls = paintPlainWalls && repairSurfaces
         let files = files
         do {
             let output = try await Task.detached(priority: .userInitiated) {

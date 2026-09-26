@@ -49,8 +49,14 @@ enum AIEvalRunner {
                     }
                     try renderViews("before")
                     let start = Date()
-                    _ = try ScanProcessor(files: files, options: ProcessingOptions(maxTexturePages: 4, texturePageSize: 4096, buildPointCloud: false))
-                        .run { p in if Int(p.fraction * 100) % 10 == 0 { print(String(format: "%3.0f%% %@", p.fraction * 100, p.stage)) } }
+                    var options = ProcessingOptions(maxTexturePages: 4, texturePageSize: 4096, buildPointCloud: false)
+                    options.repairSurfaces = !arguments.contains("--no-repair")
+                    options.paintPlainWalls = !arguments.contains("--no-paint")
+                    var lastStage = ""
+                    let result = try ScanProcessor(files: files, options: options).run { p in
+                        if p.stage != lastStage { lastStage = p.stage; print(String(format: "%3.0f%% %@ (%.0fs)", p.fraction * 100, p.stage, Date().timeIntervalSince(start))) }
+                    }
+                    print("holes filled \(result.holesFilled), flat surfaces \(result.flatSurfaces), painted \(result.paintedSurfaces), triangles \(result.triangleCount)")
                     print(String(format: "processed in %.0fs", Date().timeIntervalSince(start)))
                     try renderViews("after")
                     exit(0)

@@ -342,6 +342,11 @@ private struct ProcessPanel: View {
                         ForEach(StudioTextureQuality.allCases) { Text($0.title).tag($0) }
                     }
                     Toggle("Build point cloud", isOn: $session.buildPointCloud)
+                    Toggle("Fill holes & flatten walls", isOn: $session.repairSurfaces)
+                    Toggle("Clean plain walls & ceilings", isOn: $session.paintPlainWalls)
+                        .disabled(!session.repairSurfaces)
+                    Text("Patches small holes, pulls bumpy walls, floors and ceilings flat, and paints plain walls in an even color from your photos (wallpaper, tiles and pictures keep their texture).")
+                        .font(.caption).foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
                             Text("Neutral white balance")

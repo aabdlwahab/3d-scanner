@@ -87,6 +87,34 @@ func runStudioTests(output: URL, check: (Bool, String) -> Void) throws {
         check(abs(ratio - 1 / 1.35) < 0.08, String(format: "color matching undoes a 35%% exposure drift (gain ratio %.2f, ideal %.2f)", ratio, 1 / 1.35))
     }
 
+    // MARK: Mesh repair
+
+    do {
+        // A 4 × 3 m wall grid with bumps and a hole in the middle.
+        var wall = RawMesh()
+        let nx = 40, ny = 30
+        var noise = SampleRandom(seed: 3)
+        for j in 0...ny {
+            for i in 0...nx {
+                wall.positions.append(SIMD3(Float(i) * 0.1, Float(j) * 0.1, (noise.nextFloat() - 0.5) * 0.04))
+            }
+        }
+        func vertex(_ i: Int, _ j: Int) -> UInt32 { UInt32(j * (nx + 1) + i) }
+        for j in 0..<ny {
+            for i in 0..<nx where !(i >= 18 && i < 22 && j >= 13 && j < 17) {
+                wall.indices += [vertex(i, j), vertex(i + 1, j), vertex(i + 1, j + 1), vertex(i, j), vertex(i + 1, j + 1), vertex(i, j + 1)]
+                wall.classes += [SurfaceClass.wall.rawValue, SurfaceClass.wall.rawValue]
+            }
+        }
+        wall.normals = MeshMath.vertexNormals(positions: wall.positions, indices: wall.indices)
+        let (repaired, repairReport) = MeshRepair.repair(wall)
+        let openEdges = MeshCleaner.edgeAdjacency(indices: repaired.indices).filter { $0 < 0 }.count
+        check(repairReport.holesFilled == 1 && openEdges == 2 * (nx + ny), "hole filled (\(repairReport.holesFilled) holes, \(openEdges) open edges = outer border only)")
+        let deviations = repaired.positions.map { abs($0.z) }.sorted()
+        let roughness = deviations[deviations.count * 95 / 100]
+        check(repairReport.planes == 1 && roughness < 0.003, String(format: "bumpy wall flattened onto one plane (95%% within %.1f mm, %d planes, %d of %d vertices moved)", roughness * 1000, repairReport.planes, repairReport.verticesFlattened, repaired.vertexCount))
+    }
+
     // MARK: Furnished model from a plan
 
     let furnishedPlan = apartment.furnishedPlan()

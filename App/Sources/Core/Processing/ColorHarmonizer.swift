@@ -21,7 +21,7 @@ enum ColorHarmonizer {
         var iterations = 400
         /// 0 keeps the capture's overall white balance; 1 corrects it fully to neutral (the average
         /// sampled surface becomes grey, keeping its brightness). Warm lamps otherwise tint everything.
-        var neutralize: Float = 0.5
+        var neutralize: Float = 0.3
     }
 
     /// One RGB gain per keyframe (1 for frames that aren't used or can't be sampled).

@@ -41,14 +41,17 @@ final class TextureAtlasBuilder {
     private let options: TextureAtlasOptions
     /// Per-keyframe color gains from ``ColorHarmonizer`` (nil: bake photos unchanged).
     private let gains: [SIMD3<Float>]?
+    /// Fixed colors for vertices of untextured (painted) surfaces, per source vertex.
+    private let presetColors: [SIMD4<UInt8>?]?
     /// Projection of each triangle corner into its labeled keyframe (3 per triangle).
     private var projected: [SIMD2<Float>]
     /// Source (welded) vertex of every output vertex.
     private var sourceOf: [UInt32] = []
 
     init(mesh: RawMesh, frames: [ProcessingFrame], labels: [Int32], options: TextureAtlasOptions = TextureAtlasOptions(),
-         gains: [SIMD3<Float>]? = nil) {
+         gains: [SIMD3<Float>]? = nil, presetColors: [SIMD4<UInt8>?]? = nil) {
         self.gains = gains
+        self.presetColors = presetColors
         self.mesh = mesh
         self.frames = frames
         self.labels = labels
@@ -367,6 +370,14 @@ final class TextureAtlasBuilder {
             value[s] /= weight[s]
             colored[s] = true
             queue.append(Int32(s))
+        }
+        if let presetColors, presetColors.count == sourceCount {
+            for s in 0..<sourceCount {
+                guard let c = presetColors[s] else { continue }
+                value[s] = SIMD3(Float(c.x), Float(c.y), Float(c.z))
+                if !colored[s] { queue.append(Int32(s)) }
+                colored[s] = true
+            }
         }
         guard !queue.isEmpty else { return }
 

@@ -7,7 +7,11 @@ struct ProcessingOptions: Codable, Equatable {
     var buildPointCloud = true
     /// How far to correct the scan's overall color cast towards neutral (0...1); photo-to-photo
     /// brightness and color differences are always evened out.
-    var neutralWhiteBalance: Float = 0.5
+    var neutralWhiteBalance: Float = 0.3
+    /// Fill small holes and flatten bumpy walls, floors and ceilings before texturing.
+    var repairSurfaces = true
+    /// Draw plain painted walls and ceilings in a clean, even paint color instead of patchy photos.
+    var paintPlainWalls = true
 }
 
 struct ProcessingProgress: Equatable {
@@ -24,6 +28,9 @@ struct ProcessingOutput {
     var surfaceArea: Double
     var bounds: SIMD3<Float>
     var texturedTriangleRatio: Double
+    var holesFilled = 0
+    var flatSurfaces = 0
+    var paintedSurfaces = 0
 }
 
 enum ProcessingError: LocalizedError {
@@ -57,8 +64,13 @@ final class ScanProcessor {
         let frames = try ProcessingFrame.load(files: files)
 
         report(ProcessingProgress(fraction: 0.05, stage: "Cleaning up mesh"))
-        let mesh = MeshCleaner.clean(raw)
+        var mesh = MeshCleaner.clean(raw)
         guard mesh.triangleCount > 0 else { throw ProcessingError.emptyMesh }
+        var repair = MeshRepair.Report()
+        if options.repairSurfaces {
+            report(ProcessingProgress(fraction: 0.07, stage: "Filling holes and flattening walls"))
+            (mesh, repair) = MeshRepair.repair(mesh)
+        }
         let adjacency = MeshCleaner.edgeAdjacency(indices: mesh.indices)
         let faceNormals = MeshMath.faceNormalsAndAreas(positions: mesh.positions, indices: mesh.indices).normals
 
@@ -79,7 +91,19 @@ final class ScanProcessor {
         var atlasOptions = TextureAtlasOptions()
         atlasOptions.pageSize = options.texturePageSize
         atlasOptions.maxPages = max(1, options.maxTexturePages)
-        let builder = TextureAtlasBuilder(mesh: mesh, frames: frames, labels: selection.labels, options: atlasOptions, gains: gains)
+        var labels = selection.labels
+        var presetColors: [SIMD4<UInt8>?]?
+        var paintedSurfaces = 0
+        if options.paintPlainWalls, !repair.planeList.isEmpty {
+            report(ProcessingProgress(fraction: 0.44, stage: "Cleaning up plain walls"))
+            let paint = SurfacePaint.compute(mesh: mesh, adjacency: adjacency, labels: labels, frames: frames, gains: gains,
+                                             triangleToPlane: repair.triangleToPlane, planeCount: repair.planeList.count)
+            for t in labels.indices where paint.painted[t] { labels[t] = -1 }
+            presetColors = paint.colors
+            paintedSurfaces = paint.paintedPlanes
+        }
+        let builder = TextureAtlasBuilder(mesh: mesh, frames: frames, labels: labels, options: atlasOptions, gains: gains,
+                                          presetColors: presetColors)
         let textured = try builder.build(textureURL: files.texture) { p in
             report(ProcessingProgress(fraction: 0.45 + 0.4 * p, stage: "Baking textures"))
         }
@@ -101,7 +125,7 @@ final class ScanProcessor {
 
         report(ProcessingProgress(fraction: 1, stage: "Done"))
         let labeled = selection.labeledCount
-        return ProcessingOutput(vertexCount: textured.vertexCount,
+        var output = ProcessingOutput(vertexCount: textured.vertexCount,
                                 triangleCount: textured.triangleCount,
                                 textureCount: textured.textureCount,
                                 keyframeCount: frames.count,
@@ -109,6 +133,10 @@ final class ScanProcessor {
                                 surfaceArea: surfaceArea,
                                 bounds: BoundingBox(points: mesh.positions).size,
                                 texturedTriangleRatio: Double(labeled) / Double(max(1, mesh.triangleCount)))
+        output.holesFilled = repair.holesFilled
+        output.flatSurfaces = repair.planes
+        output.paintedSurfaces = paintedSurfaces
+        return output
     }
 
     private func removeOldTextures() {
