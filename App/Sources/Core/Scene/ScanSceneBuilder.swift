@@ -175,7 +175,8 @@ enum ScanSceneBuilder {
 
     // MARK: Nodes
 
-    static func pointCloudNode(_ cloud: PointCloud, pointSize: CGFloat = 0.012) -> SCNNode {
+    /// `normals` (one per point) are optional; viewers use them to hide points facing away.
+    static func pointCloudNode(_ cloud: PointCloud, pointSize: CGFloat = 0.012, normals: [SIMD3<Float>]? = nil) -> SCNNode {
         let positions = InlineVectors.pack(cloud.positions)
         var colors = [Float]()
         colors.reserveCapacity(cloud.count * 3)
@@ -199,7 +200,15 @@ enum ScanSceneBuilder {
         element.pointSize = pointSize
         element.minimumPointScreenSpaceRadius = 1
         element.maximumPointScreenSpaceRadius = 5
-        let geometry = SCNGeometry(sources: [vertexSource, colorSource], elements: [element])
+        var sources = [vertexSource, colorSource]
+        if let normals, normals.count == cloud.count {
+            let packed = InlineVectors.pack(normals)
+            sources.append(packed.withUnsafeBytes {
+                SCNGeometrySource(data: Data($0), semantic: .normal, vectorCount: cloud.count, usesFloatComponents: true,
+                                  componentsPerVector: 3, bytesPerComponent: 4, dataOffset: 0, dataStride: 12)
+            })
+        }
+        let geometry = SCNGeometry(sources: sources, elements: [element])
         geometry.materials = [vertexColorMaterial(lit: false)]
         let node = SCNNode(geometry: geometry)
         node.name = "points"

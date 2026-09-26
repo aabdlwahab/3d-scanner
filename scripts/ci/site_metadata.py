@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Writes the install-site metadata next to the IPAs:
 
-  release.json   build info read by index.html
+  release.json   build info read by index.html (including the Mac app download)
   manifest.plist OTA install manifest (itms-services) for the signed IPA
   apps.json      AltStore / SideStore source for the unsigned IPA
 """
@@ -29,6 +29,7 @@ def load(path):
 
 unsigned = load("build/release-unsigned.json")
 signed = load("build/release-signed.json")
+mac = load("build/release-mac.json")
 if unsigned is None:
     sys.exit("build/release-unsigned.json is missing — run scripts/ci/build-ipa.sh first")
 
@@ -54,8 +55,18 @@ release = {
     "minOSVersion": "17.0",
     "unsigned": {"url": "downloads/ScanSpace-unsigned.ipa", "size": unsigned_size, "bundleId": unsigned["bundleId"]},
     "signed": None,
+    "mac": None,
     "source": f"{base}/apps.json",
 }
+
+mac_zip = os.path.join(downloads, "ScanSpace-Studio.zip")
+if mac and os.path.exists(mac_zip):
+    release["mac"] = {
+        "url": "downloads/ScanSpace-Studio.zip",
+        "size": os.path.getsize(mac_zip),
+        "version": mac["version"],
+        "minOSVersion": mac.get("minOSVersion", "14.0"),
+    }
 
 if signed:
     signed_size = os.path.getsize(os.path.join(downloads, "ScanSpace.ipa"))

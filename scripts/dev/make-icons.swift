@@ -133,6 +133,31 @@ func render(size: Int) -> CGImage {
     return ctx.makeImage()!
 }
 
+/// macOS app icon: the artwork on a rounded tile with a soft shadow (Big Sur and later layout).
+func renderMac(size: Int) -> CGImage {
+    let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4,
+                        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    ctx.interpolationQuality = .high
+    let scale = CGFloat(size) / canvas
+    ctx.scaleBy(x: scale, y: scale)
+    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
+    let path = CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: CGColor(gray: 0, alpha: 0.35))
+    ctx.addPath(path)
+    ctx.setFillColor(CGColor(red: 0.05, green: 0.06, blue: 0.12, alpha: 1))
+    ctx.fillPath()
+    ctx.restoreGState()
+    ctx.saveGState()
+    ctx.addPath(path)
+    ctx.clip()
+    ctx.translateBy(x: tile.minX, y: tile.minY)
+    ctx.scaleBy(x: tile.width / canvas, y: tile.height / canvas)
+    drawIcon(in: ctx)
+    ctx.restoreGState()
+    return ctx.makeImage()!
+}
+
 func write(_ image: CGImage, _ path: String) {
     let url = URL(fileURLWithPath: path)
     try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -143,6 +168,21 @@ func write(_ image: CGImage, _ path: String) {
 }
 
 write(render(size: 1024), "App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
+
+// macOS: an asset catalog (Xcode builds; scripts/dev/build-mac.sh turns the same PNGs into an .icns).
+var macImages: [String] = []
+for points in [16, 32, 128, 256, 512] {
+    for scale in [1, 2] {
+        let name = scale == 1 ? "icon_\(points)x\(points).png" : "icon_\(points)x\(points)@2x.png"
+        let image = renderMac(size: points * scale)
+        write(image, "Mac/Resources/Assets.xcassets/AppIcon.appiconset/\(name)")
+        macImages.append("    { \"filename\" : \"\(name)\", \"idiom\" : \"mac\", \"scale\" : \"\(scale)x\", \"size\" : \"\(points)x\(points)\" }")
+    }
+}
+let contents = "{\n  \"images\" : [\n" + macImages.joined(separator: ",\n") + "\n  ],\n  \"info\" : { \"author\" : \"xcode\", \"version\" : 1 }\n}\n"
+try! contents.write(toFile: "Mac/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json", atomically: true, encoding: .utf8)
+try! "{\n  \"info\" : { \"author\" : \"xcode\", \"version\" : 1 }\n}\n".write(toFile: "Mac/Resources/Assets.xcassets/Contents.json", atomically: true, encoding: .utf8)
 for size in [512, 180, 57, 64] {
     write(render(size: size), "site/assets/icon-\(size).png")
 }
+write(renderMac(size: 256), "site/assets/studio-256.png")

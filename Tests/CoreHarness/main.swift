@@ -190,5 +190,10 @@ try timed("all formats") { try runExportTests(files: files, output: outputRoot, 
 print("Room plan")
 try MainActor.assumeIsolated { try runRoomTests(output: outputRoot, check: check) }
 
+// MARK: - Studio engine
+
+print("Studio (blueprint, editing, import)")
+try MainActor.assumeIsolated { try runStudioTests(output: outputRoot, check: check) }
+
 print(failures == 0 ? "\nALL CHECKS PASSED" : "\n\(failures) CHECK(S) FAILED")
 exit(failures == 0 ? 0 : 1)

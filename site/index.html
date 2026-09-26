@@ -108,6 +108,12 @@
     .source button { min-height: 40px; width: auto; padding: 0 14px; font-size: 14px; border-radius: 12px; }
     footer { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0 8px; }
     .error { color: var(--warn); }
+    .mac-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+    .mac-head img { width: 56px; height: 56px; flex: none; }
+    .mac-head h2 { margin: 0; }
+    .mac-head p { margin: 2px 0 0; }
+    ul.ticks { margin: 0 0 14px; padding-left: 20px; color: var(--muted); font-size: 14px; }
+    ul.ticks li { margin: 3px 0; }
     @media (max-width: 340px) {
       .features { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
@@ -136,6 +142,28 @@
       <section class="card" id="install">
         <h2>Install</h2>
         <div id="options"><p class="muted">Loading install options…</p></div>
+      </section>
+
+      <section class="card" id="mac">
+        <div class="mac-head">
+          <img src="assets/studio-256.png" alt="ScanSpace Studio icon" width="56" height="56">
+          <div>
+            <h2>ScanSpace Studio for Mac</h2>
+            <p class="muted">The desktop companion for your scans.</p>
+          </div>
+        </div>
+        <ul class="ticks">
+          <li><b>View</b> scans in 3D: textures, surface labels, point cloud, height cut, measuring.</li>
+          <li><b>Clean</b>: crop, box-select &amp; delete, remove floating pieces, smooth, drop outlier points, level &amp; square up walls — all undoable.</li>
+          <li><b>Process</b> captures again with much larger textures (up to 4 × 8K).</li>
+          <li><b>Blueprint</b>: walls with thickness, doors, windows, rooms and areas extracted from the mesh or point cloud → PDF, SVG, DXF (CAD), PNG, or a clean 3D model.</li>
+        </ul>
+        <div id="mac-download"><p class="muted">Loading…</p></div>
+        <ol class="steps">
+          <li>Unzip and drag <b>ScanSpace Studio</b> into <b>Applications</b>.</li>
+          <li>The app isn’t notarized by Apple, so the first launch is blocked: open it, click <b>Done</b>, then go to <b>System Settings › Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
+          <li>On the iPhone, open a scan › <b>Export › ScanSpace Studio (Mac)</b> and AirDrop the <code>.scanspace</code> file to your Mac — it opens in Studio. Models from other apps (PLY, OBJ, STL, USDZ) work too.</li>
+        </ol>
       </section>
 
       <div class="features">
@@ -171,7 +199,11 @@
         </details>
         <details>
           <summary>Is my data uploaded anywhere?</summary>
-          <div>No. Scanning, processing and exporting all happen on your iPhone. Nothing leaves it unless you share an export.</div>
+          <div>No. Scanning, processing and exporting all happen on your iPhone (and in ScanSpace Studio, on your Mac). Nothing leaves your devices unless you share an export.</div>
+        </details>
+        <details>
+          <summary>“ScanSpace Studio” can’t be opened / Apple could not verify it</summary>
+          <div>macOS shows this for apps that aren’t notarized through a paid Apple Developer account. Click <b>Done</b>, open <b>System Settings › Privacy &amp; Security</b>, click <b>Open Anyway</b> next to the ScanSpace Studio message and confirm. You only need to do this once per download. Studio needs macOS 14 Sonoma or later and runs on Apple silicon and Intel Macs.</div>
         </details>
       </section>
     </main>
@@ -199,6 +231,9 @@
       }
 
       if (!isIOS) {
+        // On a computer, lead with the Mac app.
+        var main = document.querySelector('main');
+        main.insertBefore(el('mac'), main.firstChild);
         el('desktop').hidden = false;
         el('page-link').textContent = page;
         el('page-link').href = page;
@@ -260,6 +295,13 @@
           '</div>';
 
         el('options').innerHTML = html;
+
+        if (release.mac) {
+          el('mac-download').innerHTML = '<a class="btn' + (isIOS ? '' : ' primary') + '" href="' + esc(release.mac.url) + '" download>' + icons.download +
+            '<span>Download for Mac <small>· ' + mb(release.mac.size) + ' · macOS ' + esc(release.mac.minOSVersion) + '+</small></span></a>';
+        } else {
+          el('mac-download').innerHTML = '<p class="muted">The Mac app will appear here after the next build.</p>';
+        }
         el('copy').addEventListener('click', function () {
           var button = this;
           var done = function () { button.lastChild.textContent = 'Copied'; setTimeout(function () { button.lastChild.textContent = 'Copy'; }, 1600); };
@@ -277,6 +319,7 @@
         .catch(function () {
           el('meta').innerHTML = '<span class="pill">No build published yet</span>';
           el('options').innerHTML = '<p class="error">The first build hasn’t been published yet. Check back after the GitHub Actions workflow finishes.</p>';
+          el('mac-download').innerHTML = '';
         });
     })();
   </script>

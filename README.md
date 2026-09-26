@@ -17,6 +17,9 @@ Everything runs on the phone: scanning, texture baking, point-cloud fusion and e
 - Export **GLB, USDZ, OBJ (+textures, zipped), PLY mesh, point cloud PLY, STL**, raw capture data, **floor plan PDF/PNG** and **RoomPlan JSON**
 - Metric / imperial units, texture quality presets, white-balance lock for consistent textures
 
+**ScanSpace Studio** is the macOS companion: open your scans on a Mac to view, clean, re-process and measure them,
+and to extract an apartment **blueprint** from the mesh or point cloud ([details below](#scanspace-studio-for-mac)).
+
 ## Install on your iPhone (no App Store)
 
 Open **[aabdlwahab.github.io/3d-scanner](https://aabdlwahab.github.io/3d-scanner/)** in Safari on the iPhone (it is
@@ -67,6 +70,35 @@ a year. Setup, once:
 
 To add more iPhones later, register them, regenerate the profile, and update `IOS_PROVISIONING_PROFILE`.
 
+## ScanSpace Studio for Mac
+
+<p><img src="site/assets/studio-256.png" width="72" alt="ScanSpace Studio icon" align="right"></p>
+
+A desktop app for the scans you capture on the iPhone (macOS 14 Sonoma or later, Apple silicon or Intel).
+
+- **View** — textured, solid, wireframe, surface-label and point-cloud styles; height cut; top view; measuring.
+  Point clouds hide the points facing away from you, like the mesh does, so you can look into rooms from above.
+- **Clean** — crop box, rectangle select & delete, remove floating pieces, Taubin smoothing, statistical outlier
+  removal and voxel downsampling for point clouds, and **Level & Align** (floor at 0, walls on the X/Z axes — done
+  automatically the first time a LiDAR scan opens). Every edit is non-destructive and undoable; the original scan is
+  never modified.
+- **Process** — re-bake the photo textures from the raw capture at up to 4 × 8K on the Mac; edits are re-applied.
+- **Blueprint** — finds the floor and ceiling, walls (with measured thickness where both sides were scanned), doors,
+  openings, windows, rooms with areas, and furniture, from the labelled mesh *or* an unlabelled point cloud. Export a
+  dimensioned **PDF / PNG / SVG / DXF (CAD)** plan, or a clean 3D model built from the plan (GLB, USDZ).
+- **Export** — GLB, USDZ, OBJ (+textures), PLY, STL, point cloud PLY. **Import** PLY, OBJ, STL and USD/USDZ from other apps.
+
+**Install:** download **ScanSpace Studio** from the [install page](https://aabdlwahab.github.io/3d-scanner/), unzip
+it and drag it to Applications. It is ad-hoc signed but not notarized (that needs a paid Apple Developer account),
+so macOS blocks the first launch: click **Done**, then **System Settings › Privacy & Security › Open Anyway**.
+Or build it yourself with `scripts/dev/build-mac.sh` — only the Command Line Tools are needed, and a locally built
+app opens without that prompt.
+
+**Moving scans to the Mac:** on the iPhone open a scan › **Export › ScanSpace Studio (Mac)** and AirDrop the
+`.scanspace` file (the whole project: model, point cloud, photos, depth and poses). It opens in Studio. Raw capture
+zips and models from other apps can be dragged into the window, too. **File › New Sample Apartment** builds a
+synthetic three-room scan to try everything without a phone.
+
 ## Scanning tips
 
 - Move slowly, and sweep each area at chest height, low (furniture, floor) and high (ceiling).
@@ -95,7 +127,20 @@ Room Plan ─ RoomCaptureView (shared ARSession, room by room) → StructureBuil
 ```
 
 `App/Sources/Core` is platform-independent (Foundation, simd, CoreGraphics, SceneKit) and is tested on macOS;
-`App/Sources/Features` holds the iOS UI, ARKit and RoomPlan code.
+`App/Sources/Features` holds the iOS UI, ARKit and RoomPlan code. ScanSpace Studio (`Mac/Sources`) is built from the
+same core plus a macOS UI:
+
+```
+Editing (App/Sources/Core/Editing)
+  EditOperation    crop, delete region, remove pieces, smooth, transform, point outliers/downsampling —
+                   stored in edits.json and replayed on the original data (undo = replay one fewer)
+Blueprint (App/Sources/Core/Blueprint)
+  levels           floor/ceiling from labels or horizontal-surface histograms
+  orientation      dominant wall direction (mod 90°) → axis-aligned plan
+  walls            per-axis histogram peaks of wall-facing samples, kept only if they span the room height;
+                   opposite faces paired for thickness; doorways and openings from gaps under a lintel
+  rooms            occupancy grid → close, fill, label components between walls → outlines + areas
+```
 
 ## Development
 
@@ -103,14 +148,19 @@ Room Plan ─ RoomCaptureView (shared ARSession, room by room) → StructureBuil
 | --- | --- |
 | Generate the Xcode project (needs Xcode 16+) | `brew install xcodegen && xcodegen generate && open ScanSpace.xcodeproj` |
 | Test the processing/export core on macOS (only the Command Line Tools) | `scripts/dev/test-core.sh` |
+| Build ScanSpace Studio without Xcode → `build/mac/ScanSpace Studio.app` | `scripts/dev/build-mac.sh` |
 | Type-check the whole iOS app without Xcode (Mac Catalyst SDK) | `scripts/dev/typecheck.sh` |
 | Regenerate the app and page icons | `swift scripts/dev/make-icons.swift` |
 
 `test-core.sh` renders a synthetic textured room into fake LiDAR keyframes, runs the real pipeline and checks the baked
 textures against ground truth, then validates every export format and the floor-plan maths (renders land in `Tests/.out/`).
+It also scans a synthetic three-room apartment and checks the Studio engine: blueprint extraction against the known
+walls, doors, windows and room areas (from the mesh and from a bare point cloud), every edit operation, the SVG/DXF
+exports, model import and `.scanspace` archives.
 
 CI (`.github/workflows/build.yml`) runs on every push to `main`: it generates the project, builds the unsigned IPA
-(and the signed one when secrets exist) on a `macos-26` runner, and deploys `site/` plus the IPAs, the OTA manifest
-and the SideStore/AltStore source to GitHub Pages.
+(and the signed one when secrets exist) and the universal ScanSpace Studio app on a `macos-26` runner, and deploys
+`site/` plus the IPAs, the Mac app zip, the OTA manifest and the SideStore/AltStore source to GitHub Pages.
 
 **Requirements:** iPhone or iPad with LiDAR (iPhone 12 Pro and newer Pro models), iOS 17 or later.
+ScanSpace Studio: macOS 14 or later.

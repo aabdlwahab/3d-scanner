@@ -8,6 +8,8 @@ struct FloorPlanGeometry {
     struct Segment {
         var start: CGPoint
         var end: CGPoint
+        /// Drawn wall thickness in meters (RoomPlan walls have none, so a default is used).
+        var thickness: Double = FloorPlanGeometry.defaultThickness
         var length: Double { hypot(end.x - start.x, end.y - start.y) }
         var midpoint: CGPoint { CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2) }
         var angle: Double { atan2(end.y - start.y, end.x - start.x) }
@@ -29,6 +31,8 @@ struct FloorPlanGeometry {
         var position: CGPoint
         var area: Double?
     }
+
+    static let defaultThickness = 0.14
 
     var walls: [Segment] = []
     var doors: [Door] = []
@@ -59,10 +63,16 @@ struct FloorPlanGeometry {
             let x = Double(p.x), y = Double(p.z)
             return CGPoint(x: x * cos(-r) - y * sin(-r), y: x * sin(-r) + y * cos(-r))
         }
+        var thickness: [UUID: Double] = [:]
+        for wall in data.walls where wall.dimensions.count > 2 && wall.dimensions[2] > 0.01 {
+            thickness[wall.id] = Double(wall.dimensions[2])
+        }
         func segment(_ s: FloorPlanData.Surface) -> Segment {
             let m = s.matrix
             let half = s.size.x / 2
-            return Segment(start: project(m.transformPoint(SIMD3(-half, 0, 0))), end: project(m.transformPoint(SIMD3(half, 0, 0))))
+            let width = thickness[s.kind == .wall ? s.id : (s.parentID ?? s.id)] ?? Self.defaultThickness
+            return Segment(start: project(m.transformPoint(SIMD3(-half, 0, 0))), end: project(m.transformPoint(SIMD3(half, 0, 0))),
+                           thickness: width)
         }
 
         for s in data.surfaces where include(s.story) {
@@ -97,6 +107,38 @@ struct FloorPlanGeometry {
             box = box.union(CGRect(origin: p, size: .zero))
         }
         bounds = box.isNull ? CGRect(x: -1, y: -1, width: 2, height: 2) : box
+    }
+
+    /// Walls with door, window and opening intervals removed (for vector exports).
+    func wallPieces() -> [Segment] {
+        let openingSegments = doors.map(\.segment) + windows + openings
+        var pieces: [Segment] = []
+        for wall in walls {
+            let length = wall.length
+            guard length > 1e-6 else { continue }
+            let dx = (wall.end.x - wall.start.x) / length, dy = (wall.end.y - wall.start.y) / length
+            func along(_ p: CGPoint) -> Double { (p.x - wall.start.x) * dx + (p.y - wall.start.y) * dy }
+            func across(_ p: CGPoint) -> Double { abs(-(p.x - wall.start.x) * dy + (p.y - wall.start.y) * dx) }
+            var cuts: [(Double, Double)] = []
+            for opening in openingSegments where across(opening.midpoint) < max(0.12, wall.thickness) {
+                let a = along(opening.start), b = along(opening.end)
+                let lo = max(0, min(a, b)), hi = min(length, max(a, b))
+                if hi - lo > 0.05 { cuts.append((lo, hi)) }
+            }
+            cuts.sort { $0.0 < $1.0 }
+            var cursor = 0.0
+            func add(_ from: Double, _ to: Double) {
+                guard to - from > 0.02 else { return }
+                pieces.append(Segment(start: CGPoint(x: wall.start.x + dx * from, y: wall.start.y + dy * from),
+                                      end: CGPoint(x: wall.start.x + dx * to, y: wall.start.y + dy * to), thickness: wall.thickness))
+            }
+            for (lo, hi) in cuts {
+                add(cursor, lo)
+                cursor = max(cursor, hi)
+            }
+            add(cursor, length)
+        }
+        return pieces
     }
 
     // MARK: Geometry helpers

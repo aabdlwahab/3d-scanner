@@ -1,7 +1,7 @@
 import Foundation
 
-/// Minimal ZIP writer (deflate or stored entries, no ZIP64) for bundling multi-file exports
-/// such as OBJ + MTL + textures.
+/// Minimal ZIP writer (deflate or stored entries, no ZIP64) that streams entries to disk, so
+/// large archives (a scan with hundreds of photos) never have to fit in memory.
 enum ZipWriter {
     struct Entry {
         var name: String
@@ -10,72 +10,88 @@ enum ZipWriter {
 
     enum ZipError: LocalizedError {
         case tooLarge
+        case cannotCreate(URL)
 
-        var errorDescription: String? { "The export is too large to zip (over 4 GB)." }
+        var errorDescription: String? {
+            switch self {
+            case .tooLarge: "The export is too large to zip (over 4 GB)."
+            case .cannotCreate(let url): "Couldn't create \(url.lastPathComponent)."
+            }
+        }
     }
 
+    /// File types that are already compressed and are stored as-is.
+    private static let storedExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "usdz", "zip", "glb", "scanspace"]
+
     static func write(_ entries: [Entry], to url: URL) throws {
-        var archive = Data()
+        let fm = FileManager.default
+        try? fm.removeItem(at: url)
+        guard fm.createFile(atPath: url.path, contents: nil) else { throw ZipError.cannotCreate(url) }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+
         var central = Data()
+        var offset: UInt64 = 0
         let (dosTime, dosDate) = dosTimestamp(Date())
 
         for entry in entries {
-            let contents = try Data(contentsOf: entry.source, options: .mappedIfSafe)
-            let crc = CRC32.checksum(contents)
-            // Already-compressed images are stored; everything else is deflated when it helps.
-            var method: UInt16 = 0
-            var payload = contents
-            let ext = entry.source.pathExtension.lowercased()
-            if !["jpg", "jpeg", "png", "heic", "usdz", "zip", "glb"].contains(ext),
-               let deflated = try? (contents as NSData).compressed(using: .zlib) as Data,
-               deflated.count < contents.count {
-                method = 8
-                payload = deflated
+            try autoreleasepool {
+                let contents = try Data(contentsOf: entry.source, options: .alwaysMapped)
+                let crc = CRC32.checksum(contents)
+                var method: UInt16 = 0
+                var payload = contents
+                if !storedExtensions.contains(entry.source.pathExtension.lowercased()),
+                   let deflated = try? (contents as NSData).compressed(using: .zlib) as Data,
+                   deflated.count < contents.count {
+                    method = 8
+                    payload = deflated
+                }
+                let nameBytes = Array(entry.name.utf8)
+
+                var local = BinaryWriter()
+                local.write(UInt32(0x0403_4B50))
+                local.write(UInt16(20))            // version needed
+                local.write(UInt16(0x0800))        // UTF-8 names
+                local.write(method)
+                local.write(dosTime)
+                local.write(dosDate)
+                local.write(crc)
+                local.write(UInt32(payload.count))
+                local.write(UInt32(contents.count))
+                local.write(UInt16(nameBytes.count))
+                local.write(UInt16(0))
+                local.writeRaw(nameBytes)
+
+                let localOffset = offset
+                offset += UInt64(local.data.count) + UInt64(payload.count)
+                guard offset < UInt64(UInt32.max) else { throw ZipError.tooLarge }
+                try handle.write(contentsOf: local.data)
+                try handle.write(contentsOf: payload)
+
+                var header = BinaryWriter()
+                header.write(UInt32(0x0201_4B50))
+                header.write(UInt16(0x031E))       // made by: Unix, spec 3.0
+                header.write(UInt16(20))
+                header.write(UInt16(0x0800))
+                header.write(method)
+                header.write(dosTime)
+                header.write(dosDate)
+                header.write(crc)
+                header.write(UInt32(payload.count))
+                header.write(UInt32(contents.count))
+                header.write(UInt16(nameBytes.count))
+                header.write(UInt16(0))            // extra length
+                header.write(UInt16(0))            // comment length
+                header.write(UInt16(0))            // disk number
+                header.write(UInt16(0))            // internal attributes
+                header.write(UInt32(0o100644) << 16) // external attributes: regular file, rw-r--r--
+                header.write(UInt32(localOffset))
+                header.writeRaw(nameBytes)
+                central.append(header.data)
             }
-            guard archive.count < Int(UInt32.max) - payload.count else { throw ZipError.tooLarge }
-            let nameBytes = Array(entry.name.utf8)
-            let localOffset = UInt32(archive.count)
-
-            var local = BinaryWriter()
-            local.write(UInt32(0x0403_4B50))
-            local.write(UInt16(20))            // version needed
-            local.write(UInt16(0x0800))        // UTF-8 names
-            local.write(method)
-            local.write(dosTime)
-            local.write(dosDate)
-            local.write(crc)
-            local.write(UInt32(payload.count))
-            local.write(UInt32(contents.count))
-            local.write(UInt16(nameBytes.count))
-            local.write(UInt16(0))
-            local.writeRaw(nameBytes)
-            archive.append(local.data)
-            archive.append(payload)
-
-            var header = BinaryWriter()
-            header.write(UInt32(0x0201_4B50))
-            header.write(UInt16(0x031E))       // made by: Unix, spec 3.0
-            header.write(UInt16(20))
-            header.write(UInt16(0x0800))
-            header.write(method)
-            header.write(dosTime)
-            header.write(dosDate)
-            header.write(crc)
-            header.write(UInt32(payload.count))
-            header.write(UInt32(contents.count))
-            header.write(UInt16(nameBytes.count))
-            header.write(UInt16(0))            // extra length
-            header.write(UInt16(0))            // comment length
-            header.write(UInt16(0))            // disk number
-            header.write(UInt16(0))            // internal attributes
-            header.write(UInt32(0o100644) << 16) // external attributes: regular file, rw-r--r--
-            header.write(localOffset)
-            header.writeRaw(nameBytes)
-            central.append(header.data)
         }
 
-        let centralOffset = UInt32(archive.count)
-        archive.append(central)
+        guard entries.count < Int(UInt16.max), offset + UInt64(central.count) < UInt64(UInt32.max) else { throw ZipError.tooLarge }
         var end = BinaryWriter()
         end.write(UInt32(0x0605_4B50))
         end.write(UInt16(0))
@@ -83,10 +99,28 @@ enum ZipWriter {
         end.write(UInt16(entries.count))
         end.write(UInt16(entries.count))
         end.write(UInt32(central.count))
-        end.write(centralOffset)
+        end.write(UInt32(offset))
         end.write(UInt16(0))
-        archive.append(end.data)
-        try archive.write(to: url, options: .atomic)
+        try handle.write(contentsOf: central)
+        try handle.write(contentsOf: end.data)
+    }
+
+    /// All regular files below `directory`, named by their path relative to it.
+    static func entries(in directory: URL, excluding excluded: [URL] = []) -> [Entry] {
+        let rootComponents = directory.standardizedFileURL.pathComponents
+        let excludedPaths = excluded.map { $0.standardizedFileURL.pathComponents }
+        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]) else {
+            return []
+        }
+        var result: [Entry] = []
+        for case let file as URL in enumerator {
+            guard (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
+            let components = file.standardizedFileURL.pathComponents
+            guard components.starts(with: rootComponents) else { continue }
+            if excludedPaths.contains(where: { components.starts(with: $0) }) { continue }
+            result.append(Entry(name: components.dropFirst(rootComponents.count).joined(separator: "/"), source: file))
+        }
+        return result.sorted { $0.name < $1.name }
     }
 
     private static func dosTimestamp(_ date: Date) -> (UInt16, UInt16) {
@@ -114,5 +148,19 @@ enum CRC32 {
             }
         }
         return crc ^ 0xFFFF_FFFF
+    }
+}
+
+/// `.scanspace` project files: a scan folder (metadata, raw capture, processed model, room data)
+/// zipped into one file, used to move scans from the iPhone to ScanSpace Studio on the Mac.
+enum ProjectArchive {
+    static let fileExtension = "scanspace"
+
+    static func export(files: ScanFiles, to url: URL) throws {
+        var entries = ZipWriter.entries(in: files.root, excluding: [files.exportsDirectory])
+        guard entries.contains(where: { $0.name == "scan.json" }) else { throw ExportError.missingData("scan metadata") }
+        // Put the metadata first so readers can identify the archive quickly.
+        entries.sort { $0.name == "scan.json" ? true : ($1.name == "scan.json" ? false : $0.name < $1.name) }
+        try ZipWriter.write(entries, to: url)
     }
 }

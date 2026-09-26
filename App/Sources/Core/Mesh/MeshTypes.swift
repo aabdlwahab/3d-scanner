@@ -89,6 +89,25 @@ struct TexturedMesh {
     var triangleCount: Int { groups.reduce(0) { $0 + $1.indices.count / 3 } }
 }
 
+extension TexturedMesh {
+    /// Untextured stand-in for a raw capture, colored by surface class.
+    static func preview(of raw: RawMesh) -> TexturedMesh {
+        var mesh = TexturedMesh()
+        mesh.positions = raw.positions
+        mesh.normals = raw.normals.count == raw.positions.count ? raw.normals : MeshMath.vertexNormals(positions: raw.positions, indices: raw.indices)
+        mesh.uvs = [SIMD2<Float>](repeating: .zero, count: raw.positions.count)
+        var classes = [UInt8](repeating: 0, count: raw.positions.count)
+        if raw.classes.count == raw.triangleCount {
+            for t in 0..<raw.triangleCount {
+                for corner in 0..<3 { classes[Int(raw.indices[3 * t + corner])] = raw.classes[t] }
+            }
+        }
+        mesh.classes = classes
+        mesh.groups = [Group(textureIndex: -1, indices: raw.indices)]
+        return mesh
+    }
+}
+
 /// Colored point cloud (meters, +Y up).
 struct PointCloud {
     var positions: [SIMD3<Float>] = []

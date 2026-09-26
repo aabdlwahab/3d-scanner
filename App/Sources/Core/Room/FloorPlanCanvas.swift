@@ -81,24 +81,21 @@ struct FloorPlanCanvas: View {
             }
         }
 
-        // Walls.
-        let wallWidth = max(2, CGFloat(RoomSceneBuilder.wallThickness) * 1.4 * scale)
-        var walls = Path()
+        // Walls (each with its own measured or default thickness).
+        func width(_ segment: FloorPlanGeometry.Segment) -> CGFloat { max(2, CGFloat(segment.thickness) * scale) }
         for wall in geometry.walls {
-            walls.move(to: p(wall.start))
-            walls.addLine(to: p(wall.end))
+            context.stroke(line(wall, p: p), with: .color(style.wall), style: StrokeStyle(lineWidth: width(wall), lineCap: .square))
         }
-        context.stroke(walls, with: .color(style.wall), style: StrokeStyle(lineWidth: wallWidth, lineCap: .square))
 
         // Openings cut into walls.
-        let cutWidth = wallWidth + 2
         for opening in geometry.openings {
-            cut(opening, in: &context, p: p, width: cutWidth)
+            cut(opening, in: &context, p: p, width: width(opening) + 2)
             context.stroke(line(opening, p: p), with: .color(style.secondaryText.opacity(0.6)),
                            style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
         }
         for window in geometry.windows {
-            cut(window, in: &context, p: p, width: cutWidth)
+            let wallWidth = width(window)
+            cut(window, in: &context, p: p, width: wallWidth + 2)
             let normal = CGPoint(x: -sin(window.angle), y: cos(window.angle))
             let gap = wallWidth * 0.28
             for side in [-1.0, 1.0] {
@@ -109,7 +106,8 @@ struct FloorPlanCanvas: View {
             }
         }
         for door in geometry.doors {
-            cut(door.segment, in: &context, p: p, width: cutWidth)
+            let wallWidth = width(door.segment)
+            cut(door.segment, in: &context, p: p, width: wallWidth + 2)
             let hinge = p(door.segment.start)
             let radius = door.segment.length * scale
             let angle = door.segment.angle
@@ -132,7 +130,7 @@ struct FloorPlanCanvas: View {
                 var normal = CGPoint(x: -sin(wall.angle), y: cos(wall.angle))
                 // Put the label on the side facing the plan center.
                 if (center.x - mid.x) * normal.x + (center.y - mid.y) * normal.y < 0 { normal = normal * -1 }
-                let position = p(mid) + normal * (wallWidth / 2 + 9)
+                let position = p(mid) + normal * (width(wall) / 2 + 9)
                 var angle = wall.angle
                 if angle > .pi / 2 { angle -= .pi } else if angle <= -.pi / 2 { angle += .pi }
                 var label = context

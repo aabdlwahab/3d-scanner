@@ -8,6 +8,6 @@ OUT=Tests/.out
 mkdir -p "$OUT"
 # shellcheck disable=SC2046
 swiftc -O -module-name CoreHarness -target "$(uname -m)-apple-macos14.0" \
-  $(find App/Sources/Core -name '*.swift') Tests/CoreHarness/*.swift \
+  $(find App/Sources/Core -name '*.swift') Mac/Sources/Sample/*.swift Tests/CoreHarness/*.swift \
   -o "$OUT/core-harness"
 "$OUT/core-harness" "$OUT"

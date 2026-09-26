@@ -62,7 +62,8 @@ enum RoomSceneBuilder {
                 let hi = simd_min(SIMD2(c.x + hole.size.x / 2, c.y + hole.size.y / 2), SIMD2(w / 2 - 0.02, h / 2 - 0.02))
                 if hi.x - lo.x > 0.05, hi.y - lo.y > 0.05 { cutouts.append((lo, hi)) }
             }
-            builder.addWall(width: w, height: h, thickness: wallThickness, holes: cutouts, transform: wall.matrix, material: wallMaterial)
+            let thickness = wall.dimensions.count > 2 && wall.dimensions[2] > 0.01 ? wall.dimensions[2] : wallThickness
+            builder.addWall(width: w, height: h, thickness: thickness, holes: cutouts, transform: wall.matrix, material: wallMaterial)
         }
 
         // Door and window panels.

@@ -2,7 +2,7 @@ import Foundation
 import SceneKit
 
 enum ExportFormat: String, CaseIterable, Identifiable {
-    case glb, usdz, obj, ply, pointCloud, stl, floorPlanPDF, floorPlanPNG, roomJSON, rawCapture
+    case glb, usdz, obj, ply, pointCloud, stl, floorPlanPDF, floorPlanPNG, roomJSON, rawCapture, project
 
     var id: String { rawValue }
 
@@ -18,6 +18,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .floorPlanPNG: "Floor Plan Image"
         case .roomJSON: "RoomPlan JSON"
         case .rawCapture: "Raw Capture"
+        case .project: "ScanSpace Studio (Mac)"
         }
     }
 
@@ -33,6 +34,7 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .floorPlanPNG: "Dimensioned 2D plan, high-res PNG"
         case .roomJSON: "Walls, doors, windows & furniture data"
         case .rawCapture: "Photos, LiDAR depth & camera poses (.zip)"
+        case .project: "The whole scan as one .scanspace file — AirDrop it to your Mac"
         }
     }
 
@@ -47,13 +49,14 @@ enum ExportFormat: String, CaseIterable, Identifiable {
         case .floorPlanPNG: "photo"
         case .roomJSON: "curlybraces"
         case .rawCapture: "camera.aperture"
+        case .project: "desktopcomputer"
         }
     }
 
     static func formats(for kind: ScanKind) -> [ExportFormat] {
         switch kind {
-        case .lidar: [.glb, .usdz, .obj, .ply, .pointCloud, .stl, .rawCapture]
-        case .room: [.floorPlanPDF, .floorPlanPNG, .usdz, .glb, .obj, .stl, .roomJSON]
+        case .lidar: [.glb, .usdz, .obj, .ply, .pointCloud, .stl, .rawCapture, .project]
+        case .room: [.floorPlanPDF, .floorPlanPNG, .usdz, .glb, .obj, .stl, .roomJSON, .project]
         }
     }
 }
@@ -143,6 +146,10 @@ struct ScanExporter {
             try? fm.removeItem(at: url)
             try fm.copyItem(at: fm.fileExists(atPath: files.roomStructure.path) ? files.roomStructure : files.floorPlan, to: url)
             return url
+        case (_, .project):
+            let url = dir.appendingPathComponent("\(base).\(ProjectArchive.fileExtension)")
+            try ProjectArchive.export(files: files, to: url)
+            return url
         case (.room, .floorPlanPDF), (.room, .floorPlanPNG):
             guard let floorPlanRenderer else { throw ExportError.unsupported }
             let url = dir.appendingPathComponent("\(base)-floor-plan.\(format == .floorPlanPDF ? "pdf" : "png")")
@@ -175,20 +182,10 @@ struct ScanExporter {
     }
 
     private func zipRawCapture(to url: URL) throws -> URL {
-        let fm = FileManager.default
-        var entries: [ZipWriter.Entry] = []
         let readme = FileManager.default.temporaryDirectory.appendingPathComponent("ScanSpace-raw-README.txt")
         try Self.rawReadme.write(to: readme, atomically: true, encoding: .utf8)
-        entries.append(ZipWriter.Entry(name: "README.txt", source: readme))
-        if let enumerator = fm.enumerator(at: files.rawDirectory, includingPropertiesForKeys: [.isRegularFileKey]) {
-            let prefix = files.rawDirectory.standardizedFileURL.path + "/"
-            for case let file as URL in enumerator where (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
-                let relative = file.standardizedFileURL.path.replacingOccurrences(of: prefix, with: "")
-                entries.append(ZipWriter.Entry(name: relative, source: file))
-            }
-        }
-        try ZipWriter.write(entries, to: url)
-        try? fm.removeItem(at: readme)
+        defer { try? FileManager.default.removeItem(at: readme) }
+        try ZipWriter.write([ZipWriter.Entry(name: "README.txt", source: readme)] + ZipWriter.entries(in: files.rawDirectory), to: url)
         return url
     }
 
