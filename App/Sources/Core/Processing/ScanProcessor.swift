@@ -92,6 +92,9 @@ final class ScanProcessor {
         atlasOptions.pageSize = options.texturePageSize
         atlasOptions.maxPages = max(1, options.maxTexturePages)
         var labels = selection.labels
+        // Hole patches have no LiDAR depth, so photo occlusion can't be checked for them: take
+        // their color from the surrounding surface instead.
+        for t in labels.indices where t >= repair.firstPatchTriangle { labels[t] = -1 }
         var presetColors: [SIMD4<UInt8>?]?
         var paintedSurfaces = 0
         if options.paintPlainWalls, !repair.planeList.isEmpty {

@@ -13,13 +13,15 @@ enum MeshRepair {
         var maxHolePerimeter: Float = 10
         var flattenSurfaces = true
         /// Vertices within this distance of a detected plane are moved onto it.
-        var flattenTolerance: Float = 0.04
+        var flattenTolerance: Float = 0.03
         /// Only planes with at least this much surface are used (m²).
         var minPlaneArea: Float = 0.6
     }
 
     struct Report {
         var holesFilled = 0
+        /// Triangles from this index on are hole patches.
+        var firstPatchTriangle = Int.max
         var trianglesAdded = 0
         var planes = 0
         var verticesFlattened = 0
@@ -32,6 +34,7 @@ enum MeshRepair {
         var result = mesh
         var report = Report()
         if options.fillHoles {
+            report.firstPatchTriangle = mesh.triangleCount
             let filled = fillHoles(result, maxPerimeter: options.maxHolePerimeter, maxArea: options.maxHoleArea)
             result = filled.mesh
             report.holesFilled = filled.holes
@@ -312,9 +315,28 @@ enum MeshRepair {
             // Never pull a vertex far (a bad fit would tear the surface).
             if simd_distance(p, mesh.positions[v]) <= tolerance * 2 {
                 out.positions[v] = p
-                moved += 1
             }
         }
+
+        // Undo moves that fold triangles over (e.g. where a moulding meets a flattened wall):
+        // folded triangles would be textured from the wrong photos.
+        for _ in 0..<4 {
+            var reverted = false
+            for t in 0..<n {
+                let i0 = Int(mesh.indices[3 * t]), i1 = Int(mesh.indices[3 * t + 1]), i2 = Int(mesh.indices[3 * t + 2])
+                let after = simd_cross(out.positions[i1] - out.positions[i0], out.positions[i2] - out.positions[i0])
+                let length = simd_length(after)
+                guard areas[t] > 1e-8 else { continue }
+                let folded = length < 1e-9 || simd_dot(after / length, normals[t]) < 0.5
+                guard folded else { continue }
+                for v in [i0, i1, i2] where out.positions[v] != mesh.positions[v] {
+                    out.positions[v] = mesh.positions[v]
+                    reverted = true
+                }
+            }
+            if !reverted { break }
+        }
+        for v in 0..<mesh.vertexCount where out.positions[v] != mesh.positions[v] { moved += 1 }
         return (out, planes, moved, assignment)
     }
 

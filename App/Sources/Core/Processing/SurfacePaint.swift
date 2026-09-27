@@ -15,7 +15,9 @@ enum SurfacePaint {
         /// surface counts as plain paint.
         var plainThreshold: Float = 9
         /// Triangles differing this much from their surroundings keep their texture.
-        var detailThreshold: Float = 28
+        var detailThreshold: Float = 38
+        /// Stand-out patches smaller than this are treated as noise and painted over (m²).
+        var minObjectArea: Float = 0.03
     }
 
     struct Result {
@@ -128,6 +130,27 @@ enum SurfacePaint {
         }
         result.paintedPlanes = plain.filter { $0 }.count
         result.texturedPlanes = eligible.filter { $0 }.count - result.paintedPlanes
+
+        // Only clusters of stand-out triangles are real objects (pictures, switches); single ones
+        // are noise and would leave speckles in the paint.
+        var cluster = [Int32](repeating: -1, count: n)
+        var clusterArea: [Float] = []
+        for t in triangles where standsOut[t] && cluster[t] < 0 {
+            let id = Int32(clusterArea.count)
+            var stack = [t], area: Float = 0
+            cluster[t] = id
+            while let u = stack.popLast() {
+                area += areas[u]
+                for e in 0..<3 {
+                    let m = Int(adjacency[3 * u + e])
+                    guard m >= 0, standsOut[m], cluster[m] < 0 else { continue }
+                    cluster[m] = id
+                    stack.append(m)
+                }
+            }
+            clusterArea.append(area)
+        }
+        for t in triangles where standsOut[t] && clusterArea[Int(cluster[t])] < options.minObjectArea { standsOut[t] = false }
 
         // Keep a margin of texture around things that stand out.
         var keep = standsOut

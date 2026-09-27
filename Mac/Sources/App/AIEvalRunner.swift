@@ -78,6 +78,7 @@ enum AIEvalRunner {
                     print("rooms: " + result.rooms.map { String(format: "%@ %.1f m²", $0.name, $0.area) }.joined(separator: ", "))
                     print("furniture: \(result.plan.objects.map(\.category))")
                     plan = result.plan
+                    if let other = value("--camera-plan") { plan = try FloorPlanData.read(from: URL(fileURLWithPath: other)) }
                     try plan.write(to: output.appendingPathComponent("plan.json"))
                     let assets = TexturedMeshAssets(mesh: mesh, textureURLs: files.textureURLs(count: mesh.textureCount))
                     scanNode = SCNNode(geometry: assets.geometry(for: .textured))
